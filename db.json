@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/json-server/schema.json",
+  "players": [
+    {
+      "id": 1,
+      "nom": "Test",
+      "poste": "TMR",
+      "club": "TMR Club"
+    }
+  ],
+  "profile": {
+    "name": "typicode"
+  }
+}
