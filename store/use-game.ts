@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { getBps, gameReducer, INITIAL_STATE } from './game-reducer';
+import { getBpc, getBps, gameReducer, INITIAL_STATE } from './game-reducer';
 import { ACHIEVEMENTS } from './achievements-config';
 import { getZoneMaxStock } from './zones-config';
 
@@ -110,6 +110,7 @@ export function useGame(weatherMultiplier: number = 1) {
   }, []);
 
   const bps = getBps(state) * weatherRef.current;
+  const bpc = getBpc(state);
 
   const click         = useCallback((comboMultiplier?: number) => dispatch({ type: 'CLICK', comboMultiplier }), []);
   const buyUpgrade     = useCallback((id: string) => dispatch({ type: 'BUY_UPGRADE', id }), []);
@@ -121,7 +122,8 @@ export function useGame(weatherMultiplier: number = 1) {
   const upgradeZone   = useCallback((id: string) => dispatch({ type: 'UPGRADE_ZONE', id }), []);
   const harvestZone   = useCallback((id: string) => dispatch({ type: 'HARVEST_ZONE', id }), []);
   const buyWhale        = useCallback(() => dispatch({ type: 'BUY_WHALE' }), []);
-  const activateBooster  = useCallback(() => dispatch({ type: 'ACTIVATE_BOOSTER' }), []);
+  const activateBooster   = useCallback(() => dispatch({ type: 'ACTIVATE_BOOSTER' }), []);
+  const deactivateBooster = useCallback(() => dispatch({ type: 'DEACTIVATE_BOOSTER' }), []);
   const upgradeAutoClick = useCallback(() => dispatch({ type: 'UPGRADE_AUTO_CLICK' }), []);
   const devJumpToAge    = useCallback((age: number) => dispatch({
     type: 'LOAD_SAVE',
@@ -150,5 +152,5 @@ export function useGame(weatherMultiplier: number = 1) {
     AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...stateRef.current, lastSavedAt: Date.now() }));
   }, []);
 
-  return { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull, saveNow };
+  return { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull, saveNow };
 }

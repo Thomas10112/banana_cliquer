@@ -606,7 +606,6 @@ export default function WorldMapScreen() {
             <Text style={styles.iconBtnTxt}>⌖</Text>
           </Pressable>
         </View>
-        <Text style={styles.hint}>Glisse · Pince pour zoomer · Tap les bulles</Text>
       </SafeAreaView>
 
       {/* POI detail */}

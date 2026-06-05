@@ -63,6 +63,7 @@ export type GameAction =
   | { type: 'HARVEST_ZONE'; id: string }
   | { type: 'BUY_WHALE' }
   | { type: 'ACTIVATE_BOOSTER' }
+  | { type: 'DEACTIVATE_BOOSTER' }
   | { type: 'BUY_UPGRADE_BULK'; id: string; quantity: number }
   | { type: 'UPGRADE_AUTO_CLICK' }
   | { type: 'ADD_OFFLINE_GAINS'; amount: number }

@@ -410,7 +410,7 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
 }
 
 export default function BananaClicker() {
-  const { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, activateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
+  const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
   const theme  = useAgeTheme();
   const insets = useSafeAreaInsets();
 
@@ -647,7 +647,7 @@ export default function BananaClicker() {
         <Pressable style={StyleSheet.absoluteFill} onPress={(e) => handleClick(e)} />
         <WeatherOverlay type={weatherType} height={HERO_HEIGHT} />
         <View ref={statsRef} style={[styles.statsWrapper, { paddingTop: insets.top + 8 }]} pointerEvents="none">
-          <StatsBar bananas={state.bananas} bps={bps} />
+          <StatsBar bananas={state.bananas} bps={bps} bpc={bpc} />
           {weatherLabel ? (
             <Text style={styles.weather}>{weatherEmoji} {weatherLabel}</Text>
           ) : null}
@@ -673,13 +673,13 @@ export default function BananaClicker() {
       {state.boosterUnlocked && (
         <Pressable
           style={[styles.boosterBtn, isBoosterActive && styles.boosterBtnActive, boosterCooldownLeft > 0 && !isBoosterActive && styles.boosterBtnCooldown]}
-          onPress={activateBooster}
-          disabled={isBoosterActive || boosterCooldownLeft > 0}
+          onPress={isBoosterActive ? deactivateBooster : activateBooster}
+          disabled={boosterCooldownLeft > 0 && !isBoosterActive}
         >
-          <Text style={styles.boosterEmoji}>🚀</Text>
+          <Text style={styles.boosterEmoji}>{isBoosterActive ? '⏹️' : '🚀'}</Text>
           <Text style={styles.boosterTxt}>
             {isBoosterActive
-              ? `BOOST ACTIF — ${Math.ceil(state.boosterLastUsed + 120 - state.playTimeSeconds)}s`
+              ? `BOOST ACTIF — ${Math.ceil(state.boosterLastUsed + 120 - state.playTimeSeconds)}s · Stopper`
               : boosterCooldownLeft > 0
               ? `Recharge — ${Math.ceil(boosterCooldownLeft / 60)}min`
               : '×3 BPS · 2 min'}

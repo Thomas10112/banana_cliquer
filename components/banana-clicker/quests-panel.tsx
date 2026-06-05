@@ -12,7 +12,11 @@ interface QuestsPanelProps {
 export function QuestsPanel({ state, onClaim }: QuestsPanelProps) {
   const ageQuests = QUESTS.filter(q => (q.minAge ?? 0) === state.currentAge);
   const firstUnclaimedIdx = ageQuests.findIndex(q => !state.claimedQuests.includes(q.id));
-  const visibleQuests = firstUnclaimedIdx === -1 ? ageQuests : ageQuests.slice(0, firstUnclaimedIdx + 1);
+  const visible = firstUnclaimedIdx === -1 ? ageQuests : ageQuests.slice(0, firstUnclaimedIdx + 1);
+  const visibleQuests = [
+    ...visible.filter(q => !state.claimedQuests.includes(q.id)),
+    ...visible.filter(q =>  state.claimedQuests.includes(q.id)),
+  ];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

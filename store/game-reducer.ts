@@ -33,6 +33,13 @@ export function getUpgradeCost(id: string, count: number): number {
   return Math.floor(config.baseCost * Math.pow(1.15, count));
 }
 
+export function getBpc(state: GameState): number {
+  const zoneClick = ZONES
+    .filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.clickBonus)
+    .reduce((sum, z) => sum + (z.bonus.clickBonus ?? 0), 0);
+  return state.bananasPerClick + (state.heritageBpc ?? 0) + zoneClick;
+}
+
 export function getBps(state: GameState): number {
   const base = UPGRADES.reduce((total, config) => {
     const count = state.upgrades[config.id] ?? 0;
@@ -254,6 +261,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!state.boosterUnlocked) return state;
       if (state.playTimeSeconds < state.boosterLastUsed + 600) return state;
       return { ...state, boosterLastUsed: state.playTimeSeconds };
+    }
+
+    case 'DEACTIVATE_BOOSTER': {
+      if (!state.boosterUnlocked) return state;
+      // Expire le boost immédiatement (cooldown repart de maintenant)
+      return { ...state, boosterLastUsed: state.playTimeSeconds - 120 };
     }
 
     case 'GRANDE_MIGRATION': {
