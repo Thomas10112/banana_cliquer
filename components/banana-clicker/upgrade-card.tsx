@@ -70,7 +70,7 @@ export function UpgradeCard({ config, count, bananas, quantity, onBuy, onBuyBulk
             <Text style={styles.maxText}>MAX</Text>
           </View>
         ) : (
-          <Text style={[styles.cost, !canAfford && styles.costDisabled]}>
+          <Text style={[styles.cost, canAfford ? styles.costAffordable : styles.costUnaffordable]}>
             {formatBananas(cost)} 🍌
           </Text>
         )}
@@ -105,8 +105,9 @@ const styles = StyleSheet.create({
   description: { fontSize: 12, color: '#8d6e63' },
   bps:         { fontSize: 12, color: '#f9a825', fontWeight: '500' },
   right:       { alignItems: 'flex-end', gap: 4 },
-  cost:        { fontSize: 14, fontWeight: '700', color: '#e65100' },
-  costDisabled: { color: '#bbb' },
+  cost:             { fontSize: 14, fontWeight: '700' },
+  costAffordable:   { color: '#4caf50' },
+  costUnaffordable: { color: '#f44336' },
   count:       { fontSize: 12, color: '#8d6e63' },
   maxBadge:    { backgroundColor: '#4caf50', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   maxText:     { fontSize: 12, fontWeight: '800', color: '#fff' },
