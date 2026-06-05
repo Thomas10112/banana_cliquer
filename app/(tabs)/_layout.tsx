@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import * as Updates from 'expo-updates';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
@@ -155,6 +156,92 @@ const toastStyles = StyleSheet.create({
   close: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginLeft: 4 },
 });
 
+function UpdateBanner() {
+  const { isUpdateAvailable, isUpdatePending, availableUpdate } = Updates.useUpdates();
+  const [dismissed, setDismissed] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const insets = useSafeAreaInsets();
+  const ty      = useSharedValue(-150);
+  const op      = useSharedValue(0);
+  const doneRef = useRef(false);
+
+  const shouldShow = (isUpdateAvailable || isUpdatePending) && !dismissed;
+
+  useEffect(() => {
+    if (!shouldShow) return;
+    ty.value = withSpring(0, { damping: 14, stiffness: 140 });
+    op.value = withTiming(1, { duration: 250 });
+  }, [shouldShow]);
+
+  function hide(cb?: () => void) {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    ty.value = withTiming(-150, { duration: 300 });
+    op.value = withTiming(0, { duration: 300 }, (f) => { if (f && cb) runOnJS(cb)(); });
+  }
+
+  const manifest = availableUpdate?.manifest as any;
+  const message: string =
+    manifest?.metadata?.message ??
+    manifest?.extra?.expoClient?.extra?.updateMessage ??
+    '';
+
+  async function install() {
+    setInstalling(true);
+    try {
+      if (!isUpdatePending) await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    } catch {
+      setInstalling(false);
+      doneRef.current = false;
+    }
+  }
+
+  const bannerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: ty.value }],
+    opacity: op.value,
+    top: insets.top + 8,
+  }));
+
+  if (!shouldShow) return null;
+
+  return (
+    <Animated.View style={[upStyles.banner, bannerStyle]}>
+      <View style={{ flex: 1 }}>
+        <Text style={upStyles.title}>🔄 Mise à jour disponible</Text>
+        {!!message && <Text style={upStyles.msg} numberOfLines={2}>{message}</Text>}
+      </View>
+      <View style={upStyles.actions}>
+        <Pressable onPress={install} disabled={installing} style={upStyles.installBtn}>
+          <Text style={upStyles.installTxt}>{installing ? '…' : 'Installer'}</Text>
+        </Pressable>
+        <Pressable onPress={() => hide(() => setDismissed(true))} style={upStyles.laterBtn}>
+          <Text style={upStyles.laterTxt}>Plus tard</Text>
+        </Pressable>
+      </View>
+    </Animated.View>
+  );
+}
+
+const upStyles = StyleSheet.create({
+  banner: {
+    position: 'absolute', left: 12, right: 12, zIndex: 9999,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(15,20,40,0.97)',
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1.5, borderColor: '#29b6f6',
+    shadowColor: '#29b6f6', shadowOpacity: 0.4,
+    shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 15,
+  },
+  title:      { fontSize: 13, fontWeight: '800', color: '#fff' },
+  msg:        { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  actions:    { gap: 6, alignItems: 'flex-end' },
+  installBtn: { backgroundColor: '#29b6f6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
+  installTxt: { fontSize: 12, fontWeight: '800', color: '#0a0a1a' },
+  laterBtn:   { paddingHorizontal: 4, paddingVertical: 2 },
+  laterTxt:   { fontSize: 11, color: 'rgba(255,255,255,0.35)' },
+});
+
 function TabsWithModal() {
   const theme = useAgeTheme();
   const { state, zoneFullQueue, dismissZoneFull } = useGameContext();
@@ -232,6 +319,7 @@ function TabsWithModal() {
           onDone={dismissZoneFull}
         />
       )}
+      <UpdateBanner />
     </>
   );
 }
