@@ -513,6 +513,8 @@ export default function BananaClicker() {
   const lastClickRef     = useRef(0);
   const comboCountRef    = useRef(0);
   const comboResetRef    = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const comboUnlockedRef = useRef(state.comboUnlocked);
+  useEffect(() => { comboUnlockedRef.current = state.comboUnlocked; }, [state.comboUnlocked]);
 
   // --- Grande Migration ---
   const migrationInAge   = state.totalMigrations % 3;
@@ -598,6 +600,16 @@ export default function BananaClicker() {
   const handleClick = useCallback((evt?: { nativeEvent: { locationX: number; locationY: number } }) => {
     if (isBananaLocked()) return;
     const now = Date.now();
+
+    if (!comboUnlockedRef.current) {
+      // Combo pas encore débloqué : reset silencieux
+      comboCountRef.current = 0;
+      lastClickRef.current  = now;
+      click(1);
+      setClickCount(c => c + 1);
+      return;
+    }
+
     if (now - lastClickRef.current < 600) {
       comboCountRef.current = Math.min(comboCountRef.current + 1, 30);
     } else {
