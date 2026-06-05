@@ -272,7 +272,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         heritageBps:          state.heritageBps + bpsBonus,
         boosterUnlocked:      state.boosterUnlocked || migDoneInAge >= 1,
         boosterLastUsed:      state.boosterLastUsed,
-        comboUnlocked:        state.comboUnlocked    || migDoneInAge >= 0,
+        comboUnlocked:        migDoneInAge === 2 ? false : (state.comboUnlocked || migDoneInAge >= 1),
         totalClicks:          state.totalClicks,
       };
     }
