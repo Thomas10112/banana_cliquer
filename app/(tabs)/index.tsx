@@ -147,6 +147,105 @@ const AGE_TRANSPORT: Record<number, { emoji: string; article: string; name: stri
   4: { emoji: '🛸', article: 'un',  name: 'vaisseau logistique', namePlural: 'vaisseaux actifs' },
 };
 
+// ─── Noms des transports par âge ─────────────────────────────────────────────
+
+const WHALE_NAMES: Record<number, string[]> = {
+  0: ['Moby Dick', 'Orca Prime', 'Grand Bleu', 'Cachalot', 'Narval', 'Bélouga', 'Pélagos', 'Léviathan'],
+  1: ['Liberté', 'Commerce', 'Alizé', 'Fortune', 'Espérance', 'Zéphyr', 'Mercure', 'Victorieux'],
+  2: ['Acier', 'Fumée Noire', 'Express', 'Foudre', 'Titan', 'Vulcain', 'Cyclope', 'Tempête'],
+  3: ['Cargo Alpha', 'Eagle', 'Horizon', 'Stratosphère', 'Zénith', 'Atlas', 'Condor', 'Phoenix'],
+  4: ['Nexus', 'Quasar', 'Pulsar', 'Nebula', 'Photon', 'Tachyon', 'Quantum', 'Zenon'],
+};
+
+function getWhaleIdx(tripId: string): number {
+  const root  = tripId.replace(/_r.*$/, '');
+  const match = root.match(/w(\d+)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
+function getWhaleName(tripId: string, age: number): string {
+  const idx   = getWhaleIdx(tripId);
+  const names = WHALE_NAMES[age] ?? WHALE_NAMES[0];
+  return names[idx % names.length];
+}
+
+// ─── Modal bateaux ────────────────────────────────────────────────────────────
+
+function BoatsModal({
+  trips, pois, playTime, age, transport, followedIdx, onFollow, onClose,
+}: {
+  trips: WhaleTrip[];
+  pois: POI[];
+  playTime: number;
+  age: number;
+  transport: { emoji: string; name: string; namePlural: string };
+  followedIdx: number | null;
+  onFollow: (idx: number | null) => void;
+  onClose: () => void;
+}) {
+  if (trips.length === 0) {
+    return (
+      <View style={styles.panelOverlay} pointerEvents="box-none">
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={styles.panelCard}>
+          <Text style={styles.panelTitle}>{transport.emoji} {transport.namePlural}</Text>
+          <Text style={[styles.panelSub, { marginVertical: 24, textAlign: 'center' }]}>
+            Aucun transport actif.{'\n'}Achète-en un depuis le bloc-notes 📋
+          </Text>
+          <Pressable style={styles.panelCloseBtn} onPress={onClose}>
+            <Text style={styles.detailCloseTxt}>Fermer</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.panelOverlay} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={styles.panelCard}>
+        <Text style={styles.panelTitle}>{transport.emoji} {transport.namePlural} ({trips.length})</Text>
+        <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false}>
+          {trips.map(trip => {
+            const idx      = getWhaleIdx(trip.id);
+            const name     = getWhaleName(trip.id, age);
+            const fromPOI  = pois.find(p => p.id === trip.fromZoneId);
+            const toPOI    = pois.find(p => p.id === trip.toZoneId);
+            const fraction = Math.max(0, Math.min(1, (playTime - trip.startedAt) / trip.duration));
+            const pct      = Math.round(fraction * 100);
+            const isFollowed = followedIdx === idx;
+
+            return (
+              <View key={trip.id} style={[styles.boatRow, isFollowed && styles.boatRowFollowed]}>
+                <View style={styles.boatInfo}>
+                  <Text style={styles.boatName}>{transport.emoji} {name}</Text>
+                  <Text style={styles.boatRoute} numberOfLines={1}>
+                    {fromPOI?.label ?? trip.fromZoneId} → {toPOI?.label ?? trip.toZoneId}
+                  </Text>
+                  {/* Barre de progression */}
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
+                  </View>
+                  <Text style={styles.progressPct}>{pct}%</Text>
+                </View>
+                <Pressable
+                  style={[styles.followBtn, isFollowed && styles.followBtnActive]}
+                  onPress={() => { onFollow(isFollowed ? null : idx); onClose(); }}
+                >
+                  <Text style={styles.followBtnTxt}>{isFollowed ? '⏹' : '📍'}</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+        </ScrollView>
+        <Pressable style={styles.panelCloseBtn} onPress={onClose}>
+          <Text style={styles.detailCloseTxt}>Fermer</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 // ─── Whale animated marker ────────────────────────────────────────────────────
 
 function WhaleMarker({ trip, pois, playTime, transportEmoji }: { trip: WhaleTrip; pois: POI[]; playTime: number; transportEmoji: string }) {
@@ -454,8 +553,12 @@ export default function WorldMapScreen() {
   }, []);
   const [selectedPOI, setSelectedPOI]         = useState<POI | null>(null);
   const [showTerritories, setShowTerritories]  = useState(false);
+  const [showBoats, setShowBoats]              = useState(false);
+  const [followedWhaleIdx, setFollowedWhaleIdx] = useState<number | null>(null);
   const [indicators, setIndicators]            = useState<IndicatorData[]>([]);
   const [mapLoaded, setMapLoaded]              = useState(false);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const age       = AGES[state.currentAge];
   const mapSrc    = AGE_MAPS[state.currentAge];
@@ -508,6 +611,42 @@ export default function WorldMapScreen() {
     ty.value    = withTiming(Math.max(-maxY, Math.min(maxY, rawTy)), cfg);
   }
 
+  function scrollToMapCoord(xPct: number, yPct: number) {
+    const s    = scale.value;
+    const rawTx = MAP_W * (0.5 - xPct) * s;
+    const rawTy = MAP_H * (0.5 - yPct) * s;
+    const maxX  = Math.max(0, (MAP_W * s - SW) / 2);
+    const maxY  = Math.max(0, (MAP_H * s - SH) / 2);
+    tx.value    = Math.max(-maxX, Math.min(maxX, rawTx));
+    ty.value    = Math.max(-maxY, Math.min(maxY, rawTy));
+    savedTx.value = tx.value;
+    savedTy.value = ty.value;
+  }
+
+  const followedIdxRef = useRef(followedWhaleIdx);
+  useEffect(() => { followedIdxRef.current = followedWhaleIdx; }, [followedWhaleIdx]);
+
+  // Suivi en temps réel du transport sélectionné
+  useEffect(() => {
+    if (followedWhaleIdx === null) return;
+    const id = setInterval(() => {
+      const idx = followedIdxRef.current;
+      if (idx === null) return;
+      const s = stateRef.current;
+      const trip = s.activeWhales.find(w => getWhaleIdx(w.id) === idx);
+      if (!trip) return;
+      const fromPOI = pois.find(p => p.id === trip.fromZoneId);
+      const toPOI   = pois.find(p => p.id === trip.toZoneId);
+      if (!fromPOI || !toPOI) return;
+      const fraction = Math.max(0, Math.min(1, (s.playTimeSeconds - trip.startedAt) / trip.duration));
+      scrollToMapCoord(
+        fromPOI.xPct + (toPOI.xPct - fromPOI.xPct) * fraction,
+        fromPOI.yPct + (toPOI.yPct - fromPOI.yPct) * fraction,
+      );
+    }, 250);
+    return () => clearInterval(id);
+  }, [followedWhaleIdx, pois]);
+
   const pinch = Gesture.Pinch()
     .onBegin(() => { savedScale.value = scale.value; })
     .onUpdate(e => { scale.value = clamp(savedScale.value * e.scale, MIN_SCALE, MAX_SCALE); })
@@ -523,7 +662,11 @@ export default function WorldMapScreen() {
 
   const pan = Gesture.Pan()
     .minDistance(6)
-    .onBegin(() => { savedTx.value = tx.value; savedTy.value = ty.value; })
+    .onBegin(() => {
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+      runOnJS(setFollowedWhaleIdx)(null);
+    })
     .onUpdate(e => {
       const maxX = Math.max(0, (MAP_W * scale.value - SW) / 2);
       const maxY = Math.max(0, (MAP_H * scale.value - SH) / 2);
@@ -637,10 +780,14 @@ export default function WorldMapScreen() {
             )}
           </Pressable>
           {state.whalesOwned > 0 && (
-            <View style={styles.whaleCountBadge}>
+            <Pressable
+              style={[styles.whaleCountBadge, followedWhaleIdx !== null && styles.whaleCountBadgeActive]}
+              onPress={() => setShowBoats(true)}
+            >
               <Text style={styles.iconBtnTxt}>{transport.emoji}</Text>
               <Text style={styles.whaleCountTxt}>{state.whalesOwned}</Text>
-            </View>
+              {followedWhaleIdx !== null && <Text style={styles.followingDot}>📍</Text>}
+            </Pressable>
           )}
           <Pressable style={styles.iconBtn} onPress={resetView}>
             <Text style={styles.iconBtnTxt}>⌖</Text>
@@ -659,6 +806,20 @@ export default function WorldMapScreen() {
           onUpgrade={upgradeZone}
           onHarvest={harvestZone}
           onClose={() => setSelectedPOI(null)}
+        />
+      )}
+
+      {/* Boats modal */}
+      {showBoats && (
+        <BoatsModal
+          trips={state.activeWhales}
+          pois={pois}
+          playTime={state.playTimeSeconds}
+          age={state.currentAge}
+          transport={transport}
+          followedIdx={followedWhaleIdx}
+          onFollow={setFollowedWhaleIdx}
+          onClose={() => setShowBoats(false)}
         />
       )}
 
@@ -748,8 +909,22 @@ const styles = StyleSheet.create({
   iconBtnTxt: { fontSize: 18, color: '#fff' },
   conqueredPill:    { position: 'absolute', top: -4, right: -4, backgroundColor: '#ffd700', borderRadius: 8, paddingHorizontal: 4, paddingVertical: 1 },
   conqueredPillTxt: { fontSize: 9, fontWeight: '800', color: '#000' },
-  whaleCountBadge:  { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 10, height: 38, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  whaleCountTxt:    { fontSize: 14, fontWeight: '700', color: '#fff' },
+  whaleCountBadge:       { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 10, height: 38, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  whaleCountBadgeActive: { borderColor: '#f9a825' },
+  whaleCountTxt:         { fontSize: 14, fontWeight: '700', color: '#fff' },
+  followingDot:          { fontSize: 12 },
+  // Boats modal rows
+  boatRow:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
+  boatRowFollowed: { borderColor: '#f9a825', backgroundColor: 'rgba(249,168,37,0.1)' },
+  boatInfo:        { flex: 1, gap: 3 },
+  boatName:        { fontSize: 14, fontWeight: '700', color: '#fff' },
+  boatRoute:       { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
+  progressBar:     { height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden', marginTop: 2 },
+  progressFill:    { height: 4, backgroundColor: '#f9a825', borderRadius: 2 },
+  progressPct:     { fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
+  followBtn:       { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  followBtnActive: { backgroundColor: 'rgba(249,168,37,0.25)', borderWidth: 1, borderColor: '#f9a825' },
+  followBtnTxt:    { fontSize: 18 },
   hint:       { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
 
   // POI detail
