@@ -18,6 +18,7 @@ export const INITIAL_STATE: GameState = {
   activeWhales: [],
   whalesOwned: 0,
   heritageBpc: 0,
+  heritageBps: 0,
   boosterUnlocked: false,
   boosterLastUsed: -9999,
   comboUnlocked: false,
@@ -42,7 +43,7 @@ export function getBps(state: GameState): number {
     .filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.bpsMultiplier)
     .reduce((m, z) => m + (z.bonus.bpsMultiplier ?? 0), 1);
 
-  return base * zoneMult;
+  return base * zoneMult + (state.heritageBps ?? 0);
 }
 
 function pickRandomRoute(zoneLevels: Record<string, number>, excludeFrom?: string): { from: string; to: string } | null {
@@ -257,8 +258,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'GRANDE_MIGRATION': {
       const newTotal      = state.totalMigrations + 1;
-      const migDoneInAge  = (newTotal - 1) % 3; // 0=1ère, 1=2ème, 2=3ème migration de l'âge
+      const migDoneInAge  = (newTotal - 1) % 3;
       const newAge        = Math.floor(newTotal / 3);
+      const bpsBonus      = Math.floor(getBps(state) * 0.10);
 
       return {
         ...INITIAL_STATE,
@@ -267,6 +269,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         playTimeSeconds:      state.playTimeSeconds,
         unlockedAchievements: state.unlockedAchievements,
         heritageBpc:          state.heritageBpc + 1,
+        heritageBps:          state.heritageBps + bpsBonus,
         boosterUnlocked:      state.boosterUnlocked || migDoneInAge >= 1,
         boosterLastUsed:      state.boosterLastUsed,
         comboUnlocked:        state.comboUnlocked    || migDoneInAge >= 0,

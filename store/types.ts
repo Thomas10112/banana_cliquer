@@ -37,6 +37,7 @@ export interface GameState {
   whalesOwned: number;
   // Héritage inter-migrations
   heritageBpc: number;
+  heritageBps: number;
   boosterUnlocked: boolean;
   boosterLastUsed: number;
   comboUnlocked: boolean;

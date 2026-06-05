@@ -130,6 +130,13 @@ export default function Stats() {
             value={`+${state.heritageBpc} 🍌/clic permanent`}
           />
         )}
+        {state.heritageBps > 0 && (
+          <StatCard
+            emoji="⚡"
+            label="Héritage (bonus BPS)"
+            value={`+${formatBananas(state.heritageBps)} 🍌/s permanent`}
+          />
+        )}
         {state.boosterUnlocked && (
           <StatCard
             emoji="🚀"
