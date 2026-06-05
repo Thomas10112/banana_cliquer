@@ -6,7 +6,7 @@ import { ACHIEVEMENTS } from './achievements-config';
 import { getZoneMaxStock } from './zones-config';
 
 const SAVE_KEY = 'banana_clicker_v1';
-const TICK_MS  = 100;
+const TICK_MS  = 250;
 const SAVE_INTERVAL_MS = 5000;
 const OFFLINE_MIN_SECONDS = 60;
 const OFFLINE_CAP_SECONDS = 4 * 3600;
@@ -99,13 +99,13 @@ export function useGame(weatherMultiplier: number = 1) {
   useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
-    achievementTimer.current = setInterval(() => {
+    achievementTimer.current = setInterval(() => { // eslint-disable-line
       const s = stateRef.current;
       const newIds = ACHIEVEMENTS
         .filter(a => !s.unlockedAchievements.includes(a.id) && a.check(s))
         .map(a => a.id);
       if (newIds.length > 0) dispatch({ type: 'UNLOCK_ACHIEVEMENTS_BATCH', ids: newIds });
-    }, 500);
+    }, 1000);
     return () => clearInterval(achievementTimer.current);
   }, []);
 

@@ -53,96 +53,46 @@ const COMBO_LEVELS = [
   { min: 1.5, emoji: '⚡', label: '×1.5', color: '#ffee58', bg: 'rgba(249,168,37,0.2)',   border: '#f9a825' },
 ];
 
-// ─── Combo particles (pleuvent au point de tap) ───────────────────────────────
+// ─── Badge combo (haut-gauche, léger) ────────────────────────────────────────
 
-interface ComboParticle {
-  id: number;
-  x: number;
-  y: number;
-  label: string;
-  color: string;
-  border: string;
-  tx: number;
-}
-
-function ComboParticleItem({ p, onDone }: { p: ComboParticle; onDone: () => void }) {
-  const ty      = useSharedValue(0);
-  const opacity = useSharedValue(1);
-  const scale   = useSharedValue(0.5);
-  const rotate  = useSharedValue((Math.random() - 0.5) * 30);
+function ComboBadge({ multiplier, unlocked }: { multiplier: number; unlocked: boolean }) {
+  const op = useSharedValue(0);
+  const sc = useSharedValue(0.7);
 
   useEffect(() => {
-    scale.value   = withSpring(1, { damping: 6, stiffness: 260 });
-    ty.value      = withTiming(-(80 + Math.random() * 60), { duration: 700 });
-    opacity.value = withTiming(0, { duration: 700 }, (f) => { if (f) runOnJS(onDone)(); });
-  }, []);
+    if (multiplier > 1) {
+      op.value = withTiming(1, { duration: 120 });
+      sc.value = withSpring(1, { damping: 12, stiffness: 260 });
+    } else {
+      op.value = withTiming(0, { duration: 200 });
+    }
+  }, [multiplier]);
 
   const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: p.tx },
-      { translateY: ty.value },
-      { scale: scale.value },
-      { rotate: `${rotate.value}deg` },
-    ],
-    opacity: opacity.value,
+    opacity: op.value,
+    transform: [{ scale: sc.value }],
   }));
 
+  if (!unlocked) return null;
+  const cfg = COMBO_LEVELS.find(l => multiplier >= l.min);
+  if (!cfg) return null;
+
   return (
-    <Animated.Text style={[comboStyles.particle, {
-      left: p.x, top: p.y,
-      color: p.color,
-      textShadowColor: p.border,
-    }, style]}>
-      {p.label}
-    </Animated.Text>
+    <Animated.View style={[comboBadgeStyles.wrap, { borderColor: cfg.border, backgroundColor: cfg.bg }, style]}>
+      <Text style={comboBadgeStyles.emoji}>{cfg.emoji}</Text>
+      <Text style={[comboBadgeStyles.label, { color: cfg.color }]}>{cfg.label}</Text>
+    </Animated.View>
   );
 }
 
-function ComboParticles({ trigger }: { trigger: { x: number; y: number; multiplier: number } | null }) {
-  const [particles, setParticles] = useState<ComboParticle[]>([]);
-  const nextId = useRef(0);
-  const prevTrigger = useRef<typeof trigger>(null);
-
-  useEffect(() => {
-    if (!trigger || trigger === prevTrigger.current) return;
-    if (trigger.multiplier <= 1) return;
-    prevTrigger.current = trigger;
-    const cfg = COMBO_LEVELS.find(l => trigger.multiplier >= l.min) ?? COMBO_LEVELS[COMBO_LEVELS.length - 1];
-    const count = trigger.multiplier >= 5 ? 4 : trigger.multiplier >= 3 ? 3 : 2;
-    const batch: ComboParticle[] = Array.from({ length: count }, () => ({
-      id: nextId.current++,
-      x:  trigger.x - 20,
-      y:  trigger.y - 20,
-      tx: (Math.random() - 0.5) * 80,
-      label: cfg.label,
-      color: cfg.color,
-      border: cfg.border,
-    }));
-    setParticles(prev => [...prev, ...batch]);
-  }, [trigger]);
-
-  const remove = useCallback((id: number) => {
-    setParticles(prev => prev.filter(p => p.id !== id));
-  }, []);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {particles.map(p => (
-        <ComboParticleItem key={p.id} p={p} onDone={() => remove(p.id)} />
-      ))}
-    </View>
-  );
-}
-
-const comboStyles = StyleSheet.create({
-  particle: {
-    position: 'absolute',
-    fontSize: 42,
-    fontWeight: '900',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
-    letterSpacing: -1,
+const comboBadgeStyles = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 12, borderWidth: 1.5,
+    paddingHorizontal: 10, paddingVertical: 4,
   },
+  emoji: { fontSize: 16 },
+  label: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
 });
 
 function PulseDot({ color }: { color: string }) {
@@ -438,8 +388,7 @@ export default function BananaClicker() {
   const [shownAchievement, setShownAchievement] = useState<string | null>(null);
   const [questNotif, setQuestNotif]             = useState<{ id: string; title: string; reward: number } | null>(null);
   const prevCompleted = useRef<string[]>([]);
-  const [comboMultiplier, setComboMultiplier]   = useState(1);
-  const [comboTrigger, setComboTrigger]         = useState<{ x: number; y: number; multiplier: number } | null>(null);
+  const [comboMultiplier, setComboMultiplier] = useState(1);
   const [autoClickEnabled, setAutoClickEnabled] = useState(true);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showMigrationAnim, setShowMigrationAnim]   = useState(false);
@@ -543,9 +492,6 @@ export default function BananaClicker() {
     lastClickRef.current = now;
     const mult = getComboMultiplier(comboCountRef.current);
     setComboMultiplier(mult);
-    if (mult > 1 && evt?.nativeEvent) {
-      setComboTrigger({ x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY, multiplier: mult });
-    }
     clearTimeout(comboResetRef.current);
     comboResetRef.current = setTimeout(() => {
       comboCountRef.current = 0;
@@ -652,13 +598,14 @@ export default function BananaClicker() {
             <Text style={styles.weather}>{weatherEmoji} {weatherLabel}</Text>
           ) : null}
         </View>
+        {/* Badge combo haut-gauche */}
+        <View style={[styles.comboBadgePos, { top: insets.top + 8 }]} pointerEvents="none">
+          <ComboBadge multiplier={comboMultiplier} unlocked={state.comboUnlocked} />
+        </View>
         <View ref={bananaRef} style={styles.bananaCenter} pointerEvents="none">
           <BananaParticles clickCount={clickCount} />
           <BananaButton ref={bananaButtonRef} onPress={handleClick} />
         </View>
-        {state.comboUnlocked && (
-          <ComboParticles trigger={comboTrigger} />
-        )}
         {goldenBanana && (
           <GoldenBanana
             x={goldenBanana.x}
@@ -882,6 +829,10 @@ const styles = StyleSheet.create({
   statsWrapper: {
     alignItems: 'center',
     gap: 4,
+  },
+  comboBadgePos: {
+    position: 'absolute',
+    left: 12,
   },
   weather: {
     fontSize: 12,
