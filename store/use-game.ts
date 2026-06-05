@@ -109,7 +109,8 @@ export function useGame(weatherMultiplier: number = 1) {
     return () => clearInterval(achievementTimer.current);
   }, []);
 
-  const bps = getBps(state) * weatherRef.current;
+  const boosterActive = state.playTimeSeconds < state.boosterLastUsed + 120;
+  const bps = getBps(state) * weatherRef.current * (boosterActive ? 3 : 1);
   const bpc = getBpc(state);
 
   const click         = useCallback((comboMultiplier?: number) => dispatch({ type: 'CLICK', comboMultiplier }), []);
@@ -143,7 +144,7 @@ export function useGame(weatherMultiplier: number = 1) {
   }, []);
   const clearJustReset = useCallback(() => setJustReset(false), []);
 
-  const isBoosterActive = state.playTimeSeconds < state.boosterLastUsed + 120;
+  const isBoosterActive = boosterActive;
   const boosterCooldownLeft = Math.max(0, state.boosterLastUsed + 600 - state.playTimeSeconds);
 
   const dismissZoneFull = useCallback(() => setZoneFullQueue(q => q.slice(1)), []);

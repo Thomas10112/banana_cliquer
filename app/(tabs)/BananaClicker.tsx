@@ -593,7 +593,7 @@ export default function BananaClicker() {
         <Pressable style={StyleSheet.absoluteFill} onPress={(e) => handleClick(e)} />
         <WeatherOverlay type={weatherType} height={HERO_HEIGHT} />
         <View ref={statsRef} style={[styles.statsWrapper, { paddingTop: insets.top + 8 }]} pointerEvents="none">
-          <StatsBar bananas={state.bananas} bps={bps} bpc={bpc} />
+          <StatsBar bananas={state.bananas} bps={bps} bpc={bpc} comboMultiplier={comboMultiplier} />
           {weatherLabel ? (
             <Text style={styles.weather}>{weatherEmoji} {weatherLabel}</Text>
           ) : null}

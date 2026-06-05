@@ -1,21 +1,23 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { formatBananas } from '@/utils/format-bananas';
+import { formatBananas, formatRate } from '@/utils/format-bananas';
 
 interface StatsBarProps {
   bananas: number;
   bps: number;
   bpc: number;
+  comboMultiplier?: number;
 }
 
-export function StatsBar({ bananas, bps, bpc }: StatsBarProps) {
+export function StatsBar({ bananas, bps, bpc, comboMultiplier = 1 }: StatsBarProps) {
+  const effectiveBpc = bpc * comboMultiplier;
   return (
     <View style={styles.pill}>
       <Text style={styles.count}>{formatBananas(bananas)} 🍌</Text>
       <View style={styles.row}>
-        {bps > 0 && <Text style={styles.bps}>{formatBananas(bps)} / sec</Text>}
+        {bps > 0 && <Text style={styles.bps}>{formatRate(bps)} / sec</Text>}
         {bps > 0 && <Text style={styles.sep}>·</Text>}
-        <Text style={styles.bpc}>{formatBananas(bpc)} / clic</Text>
+        <Text style={styles.bpc}>{formatRate(effectiveBpc)} / clic</Text>
       </View>
     </View>
   );
