@@ -18,7 +18,7 @@ import { useProfile } from '@/hooks/use-profile';
 const { width: SW, height: SH } = Dimensions.get('window');
 const VERSION  = Constants.expoConfig?.version ?? '1.0.0';
 const BG       = require('@/assets/images/backgrounds/bg_banana_clicker.png');
-const LOGO     = require('@/assets/images/icon.png');
+const LOGO     = require('@/assets/images/upgrades/age-0/singe.png');
 
 const PARTICLES = [
   { x: 18,      delay: 0,    size: 20 },
@@ -265,8 +265,8 @@ export default function HomeScreen() {
         <Text style={s.menuIcon}>≡</Text>
       </Pressable>
 
-      {/* Contenu principal (tappable) */}
-      <Pressable style={s.content} onPress={play}>
+      {/* Contenu principal */}
+      <View style={s.content}>
         {/* Logo */}
         <Animated.View style={[s.logoWrap, logoStyle]}>
           <ExpoImage source={LOGO} style={s.logo} contentFit="contain" />
@@ -280,12 +280,11 @@ export default function HomeScreen() {
 
         {/* Bouton Jouer */}
         <Animated.View style={[s.playWrap, btnStyle]}>
-          <View style={s.playBtn}>
+          <Pressable style={s.playBtn} onPress={play}>
             <Text style={s.playTxt}>▶  JOUER</Text>
-          </View>
-          <Text style={s.tapHint}>Appuyez n'importe où pour continuer</Text>
+          </Pressable>
         </Animated.View>
-      </Pressable>
+      </View>
 
       {/* Panneau menu */}
       {menuOpen && <MenuPanel visible={menuOpen} onClose={() => setMenuOpen(false)} />}
