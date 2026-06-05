@@ -7,7 +7,7 @@ import { getZoneMaxStock } from './zones-config';
 
 const SAVE_KEY = 'banana_clicker_v1';
 const TICK_MS  = 100;
-const SAVE_DEBOUNCE_MS = 2000;
+const SAVE_INTERVAL_MS = 5000;
 const OFFLINE_MIN_SECONDS = 60;
 const OFFLINE_CAP_SECONDS = 4 * 3600;
 
@@ -52,15 +52,14 @@ export function useGame(weatherMultiplier: number = 1) {
     });
   }, []);
 
-  // ── Sauvegarde automatique (debouncée) ──
+  // ── Sauvegarde toutes les 5s (indépendant de l'activité) ──
   useEffect(() => {
-    if (!loadedRef.current) return;
-    clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(() => {
-      AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, lastSavedAt: Date.now() }));
-    }, SAVE_DEBOUNCE_MS);
-    return () => clearTimeout(saveTimeout.current);
-  }, [state]);
+    const id = setInterval(() => {
+      if (!loadedRef.current) return;
+      AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...stateRef.current, lastSavedAt: Date.now() }));
+    }, SAVE_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Sauvegarde immédiate quand l'app passe en arrière-plan ──
   useEffect(() => {
@@ -146,6 +145,10 @@ export function useGame(weatherMultiplier: number = 1) {
   const boosterCooldownLeft = Math.max(0, state.boosterLastUsed + 600 - state.playTimeSeconds);
 
   const dismissZoneFull = useCallback(() => setZoneFullQueue(q => q.slice(1)), []);
+  const saveNow = useCallback(() => {
+    if (!loadedRef.current) return;
+    AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...stateRef.current, lastSavedAt: Date.now() }));
+  }, []);
 
-  return { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull };
+  return { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull, saveNow };
 }

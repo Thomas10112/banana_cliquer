@@ -158,6 +158,7 @@ const toastStyles = StyleSheet.create({
 
 function UpdateBanner() {
   const { isUpdateAvailable, isUpdatePending, availableUpdate } = Updates.useUpdates();
+  const { saveNow } = useGameContext();
   const [dismissed, setDismissed] = useState(false);
   const [installing, setInstalling] = useState(false);
   const insets = useSafeAreaInsets();
@@ -189,6 +190,7 @@ function UpdateBanner() {
   async function install() {
     setInstalling(true);
     try {
+      saveNow();
       if (!isUpdatePending) await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     } catch {
