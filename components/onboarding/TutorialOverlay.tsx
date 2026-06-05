@@ -20,7 +20,7 @@ interface TutStep {
   bubble:       'top' | 'bottom' | 'center';
   elementKey?:  TutorialKey;   // mesure la vraie position de l'élément
   arrowDir?:    'up' | 'down';
-  tab?:         '/(tabs)/BananaClicker' | '/(tabs)/map';
+  tab?:         '/(tabs)/BananaClicker' | '/(tabs)/';
   btnLabel?:    string;
   isLast?:      boolean;
   accentColor?: string;
@@ -90,7 +90,7 @@ const STEPS: TutStep[] = [
   {
     text: "Maintenant, explorons la Carte du monde.\nC'est là que tu conquiers des territoires\npour des bonus permanents.",
     bubble: 'center', btnLabel: 'Explorer la Carte →',
-    tab: '/(tabs)/map',
+    tab: '/(tabs)/',
   },
 
   // ── Carte du monde ────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ const STEPS: TutStep[] = [
     bubble: 'bottom',
     elementKey: 'mapArea',
     spotlight: true, dimOpacity: 0.45,
-    tab: '/(tabs)/map',
+    tab: '/(tabs)/',
   },
   {
     text: "Ces marqueurs sont des territoires à conquérir.\nTape-en un pour voir son coût et ses bonus.",

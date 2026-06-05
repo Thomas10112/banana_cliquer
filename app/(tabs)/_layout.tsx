@@ -188,7 +188,7 @@ function TabsWithModal() {
           }}
         />
         <Tabs.Screen
-          name="map"
+          name="index"
           options={{
             title: 'Carte',
             tabBarIcon: () => <Text style={{ fontSize: 22 }}>🗺️</Text>,
