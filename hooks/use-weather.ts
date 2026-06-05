@@ -23,46 +23,48 @@ function getWeatherInfo(id: number): WeatherInfo {
 
 const FETCH_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
+let _permissionGranted: boolean | null = null; // cache module-level, une seule demande par session
+let _fetching = false;                          // empêche les appels concurrents
+
 export function useWeather(): WeatherInfo {
   const [info, setInfo] = useState<WeatherInfo>({ multiplier: 1, emoji: '🌡️', label: '', type: 'cloudy' });
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => {
-    async function fetch() {
+    async function doFetch() {
+      if (_fetching) return;
+      _fetching = true;
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          console.warn('[weather] Permission de localisation refusée');
-          return;
+        if (_permissionGranted === null) {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          _permissionGranted = status === 'granted';
         }
+        if (!_permissionGranted) return;
 
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Low,
         });
 
         const { latitude, longitude } = loc.coords;
-        console.log(`[weather] Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
 
         const res = await global.fetch(
           `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}`,
         );
+        if (res.status === 429) return; // rate limit OWM, on attend le prochain cycle
         const data = await res.json();
-        console.log('[weather] Réponse API:', JSON.stringify(data).slice(0, 200));
 
         if (data.weather?.[0]?.id) {
-          const info = getWeatherInfo(data.weather[0].id);
-          console.log(`[weather] Condition: id=${data.weather[0].id} → type=${info.type}`);
-          setInfo(info);
-        } else if (data.cod) {
-          console.error('[weather] Erreur API:', data.message ?? data.cod);
+          setInfo(getWeatherInfo(data.weather[0].id));
         }
-      } catch (e) {
-        console.error('[weather] Erreur:', e);
+      } catch {
+        // erreur réseau ou localisation, on garde la dernière valeur connue
+      } finally {
+        _fetching = false;
       }
     }
 
-    fetch();
-    intervalRef.current = setInterval(fetch, FETCH_INTERVAL);
+    doFetch();
+    intervalRef.current = setInterval(doFetch, FETCH_INTERVAL);
     return () => clearInterval(intervalRef.current);
   }, []);
 
