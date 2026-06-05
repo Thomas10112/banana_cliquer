@@ -25,7 +25,7 @@ const FETCH_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 export function useWeather(): WeatherInfo {
   const [info, setInfo] = useState<WeatherInfo>({ multiplier: 1, emoji: '🌡️', label: '', type: 'cloudy' });
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => {
     async function fetch() {

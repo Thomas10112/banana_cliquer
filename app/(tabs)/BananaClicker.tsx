@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { ImageSourcePropType, useWindowDimensions } from 'react-native';
 import { Dimensions, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -9,6 +10,7 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
@@ -17,26 +19,131 @@ import { formatBananas } from '@/utils/format-bananas';
 import { QUESTS } from '@/store/quests-config';
 import { UPGRADES } from '@/store/upgrades-config';
 import { AGES } from '@/store/ages-config';
+import { ZONES } from '@/store/zones-config';
 import { ACHIEVEMENTS } from '@/store/achievements-config';
-import { BananaButton } from '@/components/banana-clicker/banana-button';
+import { BananaButton, BananaButtonHandle } from '@/components/banana-clicker/banana-button';
 import { StatsBar } from '@/components/banana-clicker/stats-bar';
 import { UpgradesPanel } from '@/components/banana-clicker/upgrades-panel';
 import { QuestsPanel } from '@/components/banana-clicker/quests-panel';
 import { BananaParticles } from '@/components/banana-clicker/banana-particles';
 import { GoldenBanana } from '@/components/banana-clicker/golden-banana';
 import { AchievementNotification } from '@/components/banana-clicker/achievement-notification';
+import { QuestNotification } from '@/components/banana-clicker/quest-notification';
 import { WeatherOverlay } from '@/components/banana-clicker/weather-overlay';
 import { useSounds } from '@/hooks/use-sounds';
+import { useAgeTheme } from '@/hooks/use-age-theme';
+import { registerTutorialRef, fireTutorialEvent, isBananaLocked } from '@/utils/tutorial-refs';
 
 type Panel = 'upgrades' | 'quests';
 
 const AGE_BACKGROUNDS: Record<number, ImageSourcePropType> = {
-  0: require('@/assets/images/bg_banana_clicker.png'),
-  1: require('@/assets/images/bg_ere_agricole.png'),
-  2: require('@/assets/images/bg_ere_industriel.png'),
+  0: require('@/assets/images/backgrounds/bg_banana_clicker.png'),
+  1: require('@/assets/images/backgrounds/bg_ere_agricole.png'),
+  2: require('@/assets/images/backgrounds/bg_ere_industriel.png'),
+  3: require('@/assets/images/backgrounds/bg_ere_moderne.png'),
+  4: require('@/assets/images/backgrounds/bg_ere_robotique.png'),
 };
 
 const HERO_HEIGHT = Dimensions.get('window').height * 0.55;
+
+const COMBO_LEVELS = [
+  { min: 5,   emoji: '🌟', label: '×5',   color: '#e040fb', bg: 'rgba(142,36,170,0.25)',  border: '#ce93d8' },
+  { min: 3,   emoji: '💥', label: '×3',   color: '#ff5252', bg: 'rgba(229,57,53,0.2)',    border: '#e53935' },
+  { min: 2,   emoji: '🔥', label: '×2',   color: '#ff9800', bg: 'rgba(255,112,67,0.2)',   border: '#ff7043' },
+  { min: 1.5, emoji: '⚡', label: '×1.5', color: '#ffee58', bg: 'rgba(249,168,37,0.2)',   border: '#f9a825' },
+];
+
+// ─── Combo particles (pleuvent au point de tap) ───────────────────────────────
+
+interface ComboParticle {
+  id: number;
+  x: number;
+  y: number;
+  label: string;
+  color: string;
+  border: string;
+  tx: number;
+}
+
+function ComboParticleItem({ p, onDone }: { p: ComboParticle; onDone: () => void }) {
+  const ty      = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const scale   = useSharedValue(0.5);
+  const rotate  = useSharedValue((Math.random() - 0.5) * 30);
+
+  useEffect(() => {
+    scale.value   = withSpring(1, { damping: 6, stiffness: 260 });
+    ty.value      = withTiming(-(80 + Math.random() * 60), { duration: 700 });
+    opacity.value = withTiming(0, { duration: 700 }, (f) => { if (f) runOnJS(onDone)(); });
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: p.tx },
+      { translateY: ty.value },
+      { scale: scale.value },
+      { rotate: `${rotate.value}deg` },
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.Text style={[comboStyles.particle, {
+      left: p.x, top: p.y,
+      color: p.color,
+      textShadowColor: p.border,
+    }, style]}>
+      {p.label}
+    </Animated.Text>
+  );
+}
+
+function ComboParticles({ trigger }: { trigger: { x: number; y: number; multiplier: number } | null }) {
+  const [particles, setParticles] = useState<ComboParticle[]>([]);
+  const nextId = useRef(0);
+  const prevTrigger = useRef<typeof trigger>(null);
+
+  useEffect(() => {
+    if (!trigger || trigger === prevTrigger.current) return;
+    if (trigger.multiplier <= 1) return;
+    prevTrigger.current = trigger;
+    const cfg = COMBO_LEVELS.find(l => trigger.multiplier >= l.min) ?? COMBO_LEVELS[COMBO_LEVELS.length - 1];
+    const count = trigger.multiplier >= 5 ? 4 : trigger.multiplier >= 3 ? 3 : 2;
+    const batch: ComboParticle[] = Array.from({ length: count }, () => ({
+      id: nextId.current++,
+      x:  trigger.x - 20,
+      y:  trigger.y - 20,
+      tx: (Math.random() - 0.5) * 80,
+      label: cfg.label,
+      color: cfg.color,
+      border: cfg.border,
+    }));
+    setParticles(prev => [...prev, ...batch]);
+  }, [trigger]);
+
+  const remove = useCallback((id: number) => {
+    setParticles(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map(p => (
+        <ComboParticleItem key={p.id} p={p} onDone={() => remove(p.id)} />
+      ))}
+    </View>
+  );
+}
+
+const comboStyles = StyleSheet.create({
+  particle: {
+    position: 'absolute',
+    fontSize: 42,
+    fontWeight: '900',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+    letterSpacing: -1,
+  },
+});
 
 function PulseDot({ color }: { color: string }) {
   const scale = useSharedValue(1);
@@ -55,10 +162,13 @@ interface MigrationModalProps {
   isAgeAdvance: boolean;
   nextAgeName?: string;
   currentAgeName: string;
-  req: { totalBananas: number; claimedQuestId: string; description: string };
+  req: { totalBananas: number; claimedQuestId: string; description: string; minTransports?: number; allZonesMaxed?: boolean };
   questMet: boolean;
   bananaMet: boolean;
+  transportMet: boolean;
+  zonesMaxedMet: boolean;
   totalBananas: number;
+  whalesOwned: number;
   canMigrate: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -72,8 +182,10 @@ const MIGRATION_BONUSES = [
 
 function MigrationModal({
   migrationNumber, isAgeAdvance, nextAgeName, currentAgeName,
-  req, questMet, bananaMet, totalBananas, canMigrate, onConfirm, onClose,
+  req, questMet, bananaMet, transportMet, zonesMaxedMet,
+  totalBananas, whalesOwned, canMigrate, onConfirm, onClose,
 }: MigrationModalProps) {
+  const router = useRouter();
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={modalStyles.backdrop} onPress={onClose} />
@@ -111,15 +223,45 @@ function MigrationModal({
           <Text style={modalStyles.criteriaTitle}>Critères pour cette migration</Text>
           <View style={modalStyles.criteriaRow}>
             <Text style={[modalStyles.criteriaCheck, questMet && modalStyles.met]}>{questMet ? '✓' : '○'}</Text>
-            <Text style={modalStyles.criteriaText}>Tous les upgrades de l'âge débloqués</Text>
+            <Text style={[modalStyles.criteriaText, { flex: 1 }]}>Tous les upgrades de l'âge débloqués</Text>
+            {!questMet && (
+              <Pressable onPress={() => { onClose(); router.navigate('/(tabs)/BananaClicker' as any); }}>
+                <Text style={modalStyles.goBtn}>Quêtes →</Text>
+              </Pressable>
+            )}
           </View>
           <View style={modalStyles.criteriaRow}>
             <Text style={[modalStyles.criteriaCheck, bananaMet && modalStyles.met]}>{bananaMet ? '✓' : '○'}</Text>
-            <Text style={modalStyles.criteriaText}>
+            <Text style={[modalStyles.criteriaText, { flex: 1 }]}>
               {formatBananas(req.totalBananas)} 🍌 récoltées
               {!bananaMet && ` (${formatBananas(totalBananas)} / ${formatBananas(req.totalBananas)})`}
             </Text>
           </View>
+          {req.minTransports && (
+            <View style={modalStyles.criteriaRow}>
+              <Text style={[modalStyles.criteriaCheck, transportMet && modalStyles.met]}>{transportMet ? '✓' : '○'}</Text>
+              <Text style={[modalStyles.criteriaText, { flex: 1 }]}>
+                Au moins {req.minTransports} transport actif
+                {!transportMet && ` (${whalesOwned}/${req.minTransports})`}
+              </Text>
+              {!transportMet && (
+                <Pressable onPress={() => { onClose(); router.navigate('/(tabs)/' as any); }}>
+                  <Text style={modalStyles.goBtn}>Carte →</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+          {req.allZonesMaxed && (
+            <View style={modalStyles.criteriaRow}>
+              <Text style={[modalStyles.criteriaCheck, zonesMaxedMet && modalStyles.met]}>{zonesMaxedMet ? '✓' : '○'}</Text>
+              <Text style={[modalStyles.criteriaText, { flex: 1 }]}>Toutes les zones de l'âge au niveau 3</Text>
+              {!zonesMaxedMet && (
+                <Pressable onPress={() => { onClose(); router.navigate('/(tabs)/' as any); }}>
+                  <Text style={modalStyles.goBtn}>Carte →</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
 
         <Pressable
@@ -238,6 +380,7 @@ function MigrationAnimation({ currentAge, onComplete }: { currentAge: number; on
 
 function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => void; migrationNumber: number; ready: boolean }) {
   const scale = useSharedValue(1);
+  const isAgeAdvance = migrationNumber === 3;
   useEffect(() => {
     if (!ready) return;
     scale.value = withRepeat(
@@ -249,11 +392,17 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={style}>
-      <Pressable style={[styles.migrationBtn, !ready && styles.migrationBtnLocked]} onPress={onPress}>
-        <Text style={styles.migrationEmoji}>{ready ? '🌍' : '🔒'}</Text>
+      <Pressable style={[styles.migrationBtn, !ready && styles.migrationBtnLocked, isAgeAdvance && ready && styles.migrationBtnAge]} onPress={onPress}>
+        <Text style={styles.migrationEmoji}>{isAgeAdvance ? (ready ? '🌅' : '🔒') : (ready ? '🌍' : '🔒')}</Text>
         <View>
-          <Text style={styles.migrationTitle}>Grande Migration {migrationNumber}/3</Text>
-          <Text style={styles.migrationSub}>{ready ? 'Prêt à migrer !' : 'Critères non remplis'}</Text>
+          <Text style={styles.migrationTitle}>
+            {isAgeAdvance ? 'Changer d\'Ère' : `Migration ${migrationNumber}/3`}
+          </Text>
+          <Text style={styles.migrationSub}>
+            {isAgeAdvance
+              ? (ready ? 'Passer à l\'ère suivante !' : 'Critères non remplis')
+              : (ready ? 'Prêt à migrer !' : 'Critères non remplis')}
+          </Text>
         </View>
       </Pressable>
     </Animated.View>
@@ -261,7 +410,25 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
 }
 
 export default function BananaClicker() {
-  const { state, bps, click, buyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, activateBooster, isBoosterActive, boosterCooldownLeft } = useGameContext();
+  const { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, activateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
+  const theme  = useAgeTheme();
+  const insets = useSafeAreaInsets();
+
+  const bananaRef       = useRef<View>(null);
+  const bananaButtonRef = useRef<BananaButtonHandle>(null);
+  const statsRef        = useRef<View>(null);
+  const upgradesTabRef  = useRef<any>(null);
+  const questsTabRef    = useRef<any>(null);
+  const panelRef        = useRef<View>(null);
+
+  useEffect(() => {
+    registerTutorialRef('banana',       bananaRef);
+    registerTutorialRef('statsBar',     statsRef);
+    registerTutorialRef('upgradesTab',  upgradesTabRef);
+    registerTutorialRef('questsTab',    questsTabRef);
+    registerTutorialRef('upgradesPanel', panelRef);
+    registerTutorialRef('questsPanel',   panelRef);
+  }, []);
   const sounds = useSounds();
 
   const [activePanel, setActivePanel]     = useState<Panel>('upgrades');
@@ -269,16 +436,20 @@ export default function BananaClicker() {
   const [newUpgrade, setNewUpgrade]       = useState(false);
   const [goldenBanana, setGoldenBanana]   = useState<{ x: number; y: number } | null>(null);
   const [shownAchievement, setShownAchievement] = useState<string | null>(null);
+  const [questNotif, setQuestNotif]             = useState<{ id: string; title: string; reward: number } | null>(null);
+  const prevCompleted = useRef<string[]>([]);
   const [comboMultiplier, setComboMultiplier]   = useState(1);
+  const [comboTrigger, setComboTrigger]         = useState<{ x: number; y: number; multiplier: number } | null>(null);
+  const [autoClickEnabled, setAutoClickEnabled] = useState(true);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showMigrationAnim, setShowMigrationAnim]   = useState(false);
 
   const prevClaimed      = useRef<string[]>(state.claimedQuests);
   const prevAchievements = useRef<string[]>(state.unlockedAchievements);
-  const nextGoldenRef    = useRef<ReturnType<typeof setTimeout>>();
+  const nextGoldenRef    = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastClickRef     = useRef(0);
   const comboCountRef    = useRef(0);
-  const comboResetRef    = useRef<ReturnType<typeof setTimeout>>();
+  const comboResetRef    = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // --- Grande Migration ---
   const migrationInAge   = state.totalMigrations % 3;
@@ -289,9 +460,13 @@ export default function BananaClicker() {
     [state.currentAge],
   );
   const allQuestsClaimed = ageQuestIds.length > 0 && ageQuestIds.every(id => state.claimedQuests.includes(id));
-  const questMet         = allQuestsClaimed;
-  const bananaMet        = req !== null && state.totalBananas >= req.totalBananas;
-  const canMigrate       = questMet && bananaMet;
+  const questMet        = allQuestsClaimed;
+  const bananaMet       = req !== null && state.totalBananas >= req.totalBananas;
+  const transportMet    = !req?.minTransports || state.whalesOwned >= req.minTransports;
+  const zonesMaxedMet   = !req?.allZonesMaxed || ZONES
+    .filter(z => z.minAge === state.currentAge)
+    .every(z => (state.zoneLevels[z.id] ?? 0) >= 3);
+  const canMigrate       = questMet && bananaMet && transportMet && zonesMaxedMet;
   const showMigrationBtn = questMet;
 
   // --- Quêtes ---
@@ -310,6 +485,19 @@ export default function BananaClicker() {
     prevClaimed.current = state.claimedQuests;
   }, [state.claimedQuests]);
 
+  // Notif quête complétée (non réclamée)
+  useEffect(() => {
+    if (questNotif) return; // une notif à la fois
+    const newlyCompleted = completedQuestIds.filter(
+      id => !state.claimedQuests.includes(id) && !prevCompleted.current.includes(id),
+    );
+    if (newlyCompleted.length > 0) {
+      const quest = QUESTS.find(q => q.id === newlyCompleted[0]);
+      if (quest) setQuestNotif({ id: quest.id, title: quest.title, reward: quest.reward });
+    }
+    prevCompleted.current = completedQuestIds;
+  }, [completedQuestIds]);
+
   // Notif succès
   useEffect(() => {
     const newlyUnlocked = state.unlockedAchievements.filter(
@@ -318,6 +506,8 @@ export default function BananaClicker() {
     if (newlyUnlocked.length > 0) setShownAchievement(newlyUnlocked[0]);
     prevAchievements.current = state.unlockedAchievements;
   }, [state.unlockedAchievements]);
+
+  const handleClickRef = useRef<(() => void) | null>(null);
 
   // --- Banane dorée ---
   function scheduleNextGolden() {
@@ -342,7 +532,8 @@ export default function BananaClicker() {
   }
 
   // --- Handlers ---
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((evt?: { nativeEvent: { locationX: number; locationY: number } }) => {
+    if (isBananaLocked()) return;
     const now = Date.now();
     if (now - lastClickRef.current < 600) {
       comboCountRef.current = Math.min(comboCountRef.current + 1, 30);
@@ -352,6 +543,9 @@ export default function BananaClicker() {
     lastClickRef.current = now;
     const mult = getComboMultiplier(comboCountRef.current);
     setComboMultiplier(mult);
+    if (mult > 1 && evt?.nativeEvent) {
+      setComboTrigger({ x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY, multiplier: mult });
+    }
     clearTimeout(comboResetRef.current);
     comboResetRef.current = setTimeout(() => {
       comboCountRef.current = 0;
@@ -361,10 +555,30 @@ export default function BananaClicker() {
     setClickCount(c => c + 1);
   }, [click]);
 
+  // Toujours à jour pour l'auto-clic
+  handleClickRef.current = handleClick;
+
+  // --- Auto-clic ---
+  const AUTO_CLICK_RATES = [0, 1, 3, 8];
+  useEffect(() => {
+    if (state.autoClickLevel === 0 || !autoClickEnabled) return;
+    const ms = 1000 / AUTO_CLICK_RATES[state.autoClickLevel];
+    const id = setInterval(() => {
+      handleClickRef.current?.();
+      bananaButtonRef.current?.press();
+    }, ms);
+    return () => clearInterval(id);
+  }, [state.autoClickLevel, autoClickEnabled]);
+
   const handleBuy = useCallback((id: string) => {
     buyUpgrade(id);
     sounds.playBuy(id);
   }, [buyUpgrade, sounds]);
+
+  const handleBulkBuy = useCallback((id: string, qty: number) => {
+    bulkBuyUpgrade(id, qty);
+    sounds.playBuy(id);
+  }, [bulkBuyUpgrade, sounds]);
 
   const handleClaim = useCallback((id: string) => {
     claimQuest(id);
@@ -384,7 +598,8 @@ export default function BananaClicker() {
 
   function handleTabChange(panel: Panel) {
     setActivePanel(panel);
-    if (panel === 'upgrades') setNewUpgrade(false);
+    if (panel === 'upgrades') { setNewUpgrade(false); fireTutorialEvent('upgradesTabOpened'); }
+    if (panel === 'quests')   { fireTutorialEvent('questsTabOpened'); }
   }
 
   function handleMigrate() {
@@ -393,6 +608,7 @@ export default function BananaClicker() {
 
   function confirmMigrate() {
     setShowMigrationModal(false);
+    if (migrationInAge < 2) sounds.playMigration();
     setShowMigrationAnim(true);
   }
 
@@ -406,30 +622,43 @@ export default function BananaClicker() {
     : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.panelBg }]} edges={['bottom']}>
       {achievement && (
         <AchievementNotification
           achievement={achievement}
           onDone={() => setShownAchievement(null)}
         />
       )}
+      {questNotif && (
+        <QuestNotification
+          title={questNotif.title}
+          reward={questNotif.reward}
+          onClaim={() => { claimQuest(questNotif.id); setQuestNotif(null); }}
+          onDone={() => setQuestNotif(null)}
+        />
+      )}
 
       <ImageBackground
-        source={AGE_BACKGROUNDS[state.currentAge] ?? require('@/assets/images/bg_banana_clicker.png')}
+        source={AGE_BACKGROUNDS[state.currentAge] ?? require('@/assets/images/backgrounds/bg_banana_clicker.png')}
         style={styles.hero}
         resizeMode="cover"
       >
+        {/* Zone de clic étendue à tout le héro */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={(e) => handleClick(e)} />
         <WeatherOverlay type={weatherType} height={HERO_HEIGHT} />
-        <View style={styles.statsWrapper}>
+        <View ref={statsRef} style={[styles.statsWrapper, { paddingTop: insets.top + 8 }]} pointerEvents="none">
           <StatsBar bananas={state.bananas} bps={bps} />
           {weatherLabel ? (
             <Text style={styles.weather}>{weatherEmoji} {weatherLabel}</Text>
           ) : null}
         </View>
-        <View style={styles.bananaCenter}>
+        <View ref={bananaRef} style={styles.bananaCenter} pointerEvents="none">
           <BananaParticles clickCount={clickCount} />
-          <BananaButton onPress={handleClick} />
+          <BananaButton ref={bananaButtonRef} onPress={handleClick} />
         </View>
+        {state.comboUnlocked && (
+          <ComboParticles trigger={comboTrigger} />
+        )}
         {goldenBanana && (
           <GoldenBanana
             x={goldenBanana.x}
@@ -458,12 +687,60 @@ export default function BananaClicker() {
         </Pressable>
       )}
 
-      {/* Combo */}
-      {state.comboUnlocked && comboMultiplier > 1 && (
-        <View style={styles.comboBadge}>
-          <Text style={styles.comboTxt}>⚡ Combo ×{comboMultiplier}</Text>
-        </View>
-      )}
+      {/* Auto-clic — bouton icône en haut à droite du héro */}
+      {(() => {
+        const COSTS  = [100, 1000, 10000];
+        const LABELS = ['1/s', '3/s', '8/s'];
+        const lvl    = state.autoClickLevel;
+        const maxed  = lvl >= 3;
+        const cost   = maxed ? 0 : COSTS[lvl];
+        const canAfford = !maxed && state.bananas >= cost;
+        const purchased  = lvl >= 1;
+
+        // Pas encore acheté
+        if (!purchased) return (
+          <Pressable
+            style={[styles.autoClickIcon, styles.autoClickIconLocked, !canAfford && styles.autoClickIconDisabled]}
+            onPress={() => canAfford && upgradeAutoClick()}
+          >
+            <Text style={styles.autoClickIconEmoji}>🤖</Text>
+            <Text style={styles.autoClickIconSub}>{canAfford ? `${cost}🍌` : '🔒'}</Text>
+          </Pressable>
+        );
+
+        // Acheté
+        return (
+          <View style={styles.autoClickWrapper}>
+            {/* Toggle on/off */}
+            <Pressable
+              style={[styles.autoClickIcon, autoClickEnabled && styles.autoClickIconOn, maxed && styles.autoClickIconMax]}
+              onPress={() => setAutoClickEnabled(e => !e)}
+            >
+              <Text style={styles.autoClickIconEmoji}>🤖</Text>
+              <Text style={[styles.autoClickIconSub, autoClickEnabled && styles.autoClickIconSubOn]}>
+                {autoClickEnabled ? LABELS[lvl - 1] : '⏸'}
+              </Text>
+              <View style={styles.autoClickDots}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <View key={i} style={[styles.autoClickDot, i < lvl && (maxed ? styles.autoClickDotMax : styles.autoClickDotFilled)]} />
+                ))}
+              </View>
+            </Pressable>
+
+            {/* Pastille upgrade — séparée du toggle */}
+            {!maxed && (
+              <Pressable
+                style={[styles.autoClickUpgrade, canAfford && styles.autoClickUpgradeReady]}
+                onPress={() => canAfford && upgradeAutoClick()}
+              >
+                <Text style={[styles.autoClickUpgradeTxt, canAfford && styles.autoClickUpgradeTxtReady]}>
+                  {canAfford ? `⬆ ${cost}🍌` : `🔒 ${cost}🍌`}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        );
+      })()}
 
       {showMigrationBtn && (
         <MigrationButton
@@ -482,7 +759,10 @@ export default function BananaClicker() {
           req={req}
           questMet={questMet}
           bananaMet={bananaMet}
+          transportMet={transportMet}
+          zonesMaxedMet={zonesMaxedMet}
           totalBananas={state.totalBananas}
+          whalesOwned={state.whalesOwned}
           canMigrate={canMigrate}
           onConfirm={confirmMigrate}
           onClose={() => setShowMigrationModal(false)}
@@ -493,13 +773,14 @@ export default function BananaClicker() {
         <MigrationAnimation currentAge={state.currentAge} onComplete={finalizeMigrate} />
       )}
 
-      <View style={styles.tabSwitcher}>
+      <View style={[styles.tabSwitcher, { backgroundColor: theme.panelBg, borderBottomColor: theme.panelBorder }]}>
         <Pressable
-          style={[styles.tab, activePanel === 'upgrades' && styles.tabActive]}
+          ref={upgradesTabRef}
+          style={[styles.tab, activePanel === 'upgrades' && { borderBottomWidth: 2, borderBottomColor: theme.tabAccent }]}
           onPress={() => handleTabChange('upgrades')}
         >
           <View style={styles.tabLabel}>
-            <Text style={[styles.tabText, activePanel === 'upgrades' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, { color: theme.tabInactive }, activePanel === 'upgrades' && { color: theme.tabAccent }]}>
               Améliorations
             </Text>
             {newUpgrade && <PulseDot color="#66bb6a" />}
@@ -507,11 +788,12 @@ export default function BananaClicker() {
         </Pressable>
 
         <Pressable
-          style={[styles.tab, activePanel === 'quests' && styles.tabActive]}
+          ref={questsTabRef}
+          style={[styles.tab, activePanel === 'quests' && { borderBottomWidth: 2, borderBottomColor: theme.tabAccent }]}
           onPress={() => handleTabChange('quests')}
         >
           <View style={styles.tabLabel}>
-            <Text style={[styles.tabText, activePanel === 'quests' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, { color: theme.tabInactive }, activePanel === 'quests' && { color: theme.tabAccent }]}>
               Quêtes
             </Text>
             {unclaimedCount > 0 && <PulseDot color="#ef5350" />}
@@ -524,12 +806,15 @@ export default function BananaClicker() {
           upgrades={state.upgrades}
           bananas={state.bananas}
           onBuy={handleBuy}
+          onBuyBulk={handleBulkBuy}
           claimedQuestIds={state.claimedQuests}
           currentAge={state.currentAge}
         />
       ) : (
         <QuestsPanel state={state} onClaim={handleClaim} />
       )}
+      {/* Ref invisible pour mesurer la zone panel */}
+      <View ref={panelRef} style={StyleSheet.absoluteFill} pointerEvents="none" />
     </SafeAreaView>
   );
 }
@@ -560,6 +845,7 @@ const modalStyles = StyleSheet.create({
   criteriaCheck: { fontSize: 16, color: 'rgba(255,255,255,0.3)', width: 20 },
   met:           { color: '#66bb6a' },
   criteriaText:  { fontSize: 13, color: '#fff', flex: 1 },
+  goBtn:         { fontSize: 12, fontWeight: '800', color: '#f9a825', paddingHorizontal: 8, paddingVertical: 4 },
   confirmBtn: {
     backgroundColor: '#1b5e20', borderRadius: 14, paddingVertical: 14,
     width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#4caf50',
@@ -585,7 +871,6 @@ const modalStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fffde7',
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
@@ -595,7 +880,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   statsWrapper: {
-    paddingTop: 16,
     alignItems: 'center',
     gap: 4,
   },
@@ -629,6 +913,7 @@ const styles = StyleSheet.create({
   migrationTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
   migrationSub:        { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   migrationBtnLocked:  { backgroundColor: '#4e342e', borderColor: '#8d6e63' },
+  migrationBtnAge:     { backgroundColor: '#0d47a1', borderColor: '#42a5f5' },
   boosterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#1a237e', paddingHorizontal: 16, paddingVertical: 10,
@@ -639,11 +924,45 @@ const styles = StyleSheet.create({
   boosterBtnCooldown: { backgroundColor: '#1a1a2e', borderColor: '#37474f', opacity: 0.7 },
   boosterEmoji: { fontSize: 20 },
   boosterTxt:   { fontSize: 13, fontWeight: '700', color: '#fff' },
-  comboBadge: {
-    alignSelf: 'center', backgroundColor: '#f57f17',
-    paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12, marginTop: 4,
+  autoClickWrapper: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    alignItems: 'center',
+    gap: 4,
   },
-  comboTxt: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  autoClickIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(20,20,50,0.75)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(100,100,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoClickIconOn:       { borderColor: '#7c4dff', backgroundColor: 'rgba(60,20,120,0.85)' },
+  autoClickIconMax:      { borderColor: '#ffd700', backgroundColor: 'rgba(50,40,0,0.85)' },
+  autoClickIconLocked:   { borderColor: 'rgba(255,255,255,0.15)' },
+  autoClickIconDisabled: { opacity: 0.4 },
+  autoClickIconEmoji:    { fontSize: 22, lineHeight: 26 },
+  autoClickIconSub:      { fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: '700' },
+  autoClickIconSubOn:    { color: '#b388ff' },
+  autoClickDots:         { flexDirection: 'row', gap: 2, marginTop: 1 },
+  autoClickDot:          { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
+  autoClickDotFilled:    { backgroundColor: '#b388ff' },
+  autoClickDotMax:       { backgroundColor: '#ffd700' },
+  autoClickUpgrade: {
+    backgroundColor: 'rgba(20,20,50,0.75)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(100,100,255,0.3)',
+  },
+  autoClickUpgradeReady:    { borderColor: '#7c4dff', backgroundColor: 'rgba(60,20,120,0.85)' },
+  autoClickUpgradeTxt:      { fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: '700' },
+  autoClickUpgradeTxtReady: { color: '#b388ff' },
   tabSwitcher: {
     flexDirection: 'row',
     backgroundColor: '#fff8e1',

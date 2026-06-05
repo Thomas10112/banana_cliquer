@@ -1,4 +1,5 @@
 import { UPGRADES } from './upgrades-config';
+import { QUESTS } from './quests-config';
 import { ZONES, getZoneDelivery, getZoneMaxStock, getZoneUpgradeCost, getWhaleCost, WHALE_TRIP_DURATION } from './zones-config';
 import { GameAction, GameState, WhaleTrip } from './types';
 
@@ -20,6 +21,9 @@ export const INITIAL_STATE: GameState = {
   boosterUnlocked: false,
   boosterLastUsed: -9999,
   comboUnlocked: false,
+  lastSavedAt: 0,
+  autoClickLevel: 0,
+  totalClicks: 0,
 };
 
 export function getUpgradeCost(id: string, count: number): number {
@@ -66,6 +70,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         bananas: state.bananas + gained,
         totalBananas: state.totalBananas + gained,
+        totalClicks: state.totalClicks + 1,
       };
     }
 
@@ -79,6 +84,23 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         bananas: state.bananas - cost,
         upgrades: { ...state.upgrades, [action.id]: count + 1 },
+      };
+    }
+
+    case 'BUY_UPGRADE_BULK': {
+      const config = UPGRADES.find(u => u.id === action.id);
+      if (!config) return state;
+      const count = state.upgrades[action.id] ?? 0;
+      const maxBuy = config.maxCount !== undefined ? config.maxCount - count : action.quantity;
+      const qty = Math.min(action.quantity, maxBuy);
+      if (qty <= 0) return state;
+      let totalCost = 0;
+      for (let i = 0; i < qty; i++) totalCost += getUpgradeCost(action.id, count + i);
+      if (state.bananas < totalCost) return state;
+      return {
+        ...state,
+        bananas: state.bananas - totalCost,
+        upgrades: { ...state.upgrades, [action.id]: count + qty },
       };
     }
 
@@ -200,6 +222,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, unlockedAchievements: [...state.unlockedAchievements, action.id] };
     }
 
+    case 'UNLOCK_ACHIEVEMENTS_BATCH': {
+      const newIds = action.ids.filter(id => !state.unlockedAchievements.includes(id));
+      if (newIds.length === 0) return state;
+      return { ...state, unlockedAchievements: [...state.unlockedAchievements, ...newIds] };
+    }
+
     case 'COLLECT_GOLDEN': {
       const bonus = Math.max(50, Math.floor(state.totalBananas * 0.05));
       return {
@@ -211,7 +239,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'CLAIM_QUEST': {
       if (state.claimedQuests.includes(action.id)) return state;
-      return { ...state, claimedQuests: [...state.claimedQuests, action.id] };
+      const quest  = QUESTS.find(q => q.id === action.id);
+      const reward = quest?.reward ?? 0;
+      return {
+        ...state,
+        claimedQuests: [...state.claimedQuests, action.id],
+        bananas:       state.bananas + reward,
+        totalBananas:  state.totalBananas + reward,
+      };
     }
 
     case 'ACTIVATE_BOOSTER': {
@@ -234,9 +269,29 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         heritageBpc:          state.heritageBpc + 1,
         boosterUnlocked:      state.boosterUnlocked || migDoneInAge >= 1,
         boosterLastUsed:      state.boosterLastUsed,
-        comboUnlocked:        state.comboUnlocked    || migDoneInAge >= 2,
+        comboUnlocked:        state.comboUnlocked    || migDoneInAge >= 0,
+        totalClicks:          state.totalClicks,
       };
     }
+
+    case 'UPGRADE_AUTO_CLICK': {
+      if (state.autoClickLevel >= 3) return state;
+      const costs = [100, 1000, 10000];
+      const cost  = costs[state.autoClickLevel];
+      if (state.bananas < cost) return state;
+      return {
+        ...state,
+        bananas: state.bananas - cost,
+        autoClickLevel: state.autoClickLevel + 1,
+      };
+    }
+
+    case 'ADD_OFFLINE_GAINS':
+      return {
+        ...state,
+        bananas: state.bananas + action.amount,
+        totalBananas: state.totalBananas + action.amount,
+      };
 
     case 'LOAD_SAVE':
       return { ...INITIAL_STATE, ...action.payload };

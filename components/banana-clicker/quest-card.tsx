@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { QuestConfig } from '@/store/quests-config';
 import { GameState } from '@/store/types';
+import { formatBananas } from '@/utils/format-bananas';
 
 interface QuestCardProps {
   quest: QuestConfig;
@@ -32,6 +33,9 @@ export function QuestCard({ quest, state, claimed, onClaim }: QuestCardProps) {
       {readyToClaim && (
         <Pressable style={styles.claimBtn} onPress={() => onClaim(quest.id)}>
           <Text style={styles.claimText}>🎁 Réclamer</Text>
+          {quest.reward > 0 && (
+            <Text style={styles.rewardText}>+{formatBananas(quest.reward)} 🍌</Text>
+          )}
         </Pressable>
       )}
     </View>
@@ -108,5 +112,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+  },
+  rewardText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
   },
 });

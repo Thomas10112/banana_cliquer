@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameContext } from '@/store/game-context';
 import { StatCard } from '@/components/banana-clicker/stat-card';
@@ -9,8 +9,68 @@ import { ZONES, zoneBonusLabel } from '@/store/zones-config';
 import { formatBananas } from '@/utils/format-bananas';
 import { formatPlayTime } from '@/utils/format-play-time';
 
+function AchievementsModal({ visible, onClose, unlockedIds }: {
+  visible: boolean; onClose: () => void; unlockedIds: string[];
+}) {
+  const unlocked = ACHIEVEMENTS.filter(a => unlockedIds.includes(a.id));
+  const locked   = ACHIEVEMENTS.filter(a => !unlockedIds.includes(a.id));
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={achStyles.overlay}>
+        <View style={achStyles.sheet}>
+          <View style={achStyles.header}>
+            <Text style={achStyles.title}>🏆 Succès</Text>
+            <Text style={achStyles.count}>{unlocked.length}/{ACHIEVEMENTS.length}</Text>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={achStyles.scroll}>
+            {unlocked.map(a => (
+              <View key={a.id} style={achStyles.row}>
+                <Text style={achStyles.rowTitle}>{a.title}</Text>
+                <Text style={achStyles.rowDesc}>{a.description}</Text>
+              </View>
+            ))}
+            {locked.length > 0 && (
+              <>
+                <Text style={achStyles.lockedHeader}>Verrouillés</Text>
+                {locked.map(a => (
+                  <View key={a.id} style={[achStyles.row, achStyles.rowLocked]}>
+                    <Text style={achStyles.rowTitleLocked}>🔒 {a.title}</Text>
+                    <Text style={achStyles.rowDescLocked}>{a.description}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </ScrollView>
+          <Pressable style={achStyles.closeBtn} onPress={onClose}>
+            <Text style={achStyles.closeTxt}>Fermer</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const achStyles = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:      { backgroundColor: '#12122a', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  title:      { fontSize: 20, fontWeight: '800', color: '#fff' },
+  count:      { fontSize: 14, fontWeight: '700', color: '#ffd700', backgroundColor: 'rgba(255,215,0,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  scroll:     { flexGrow: 0 },
+  row:        { backgroundColor: 'rgba(255,215,0,0.1)', borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,215,0,0.25)' },
+  rowLocked:  { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' },
+  rowTitle:   { fontSize: 14, fontWeight: '700', color: '#ffd700' },
+  rowDesc:    { fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  rowTitleLocked: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.3)' },
+  rowDescLocked:  { fontSize: 12, color: 'rgba(255,255,255,0.2)', marginTop: 2 },
+  lockedHeader: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 8, marginBottom: 6 },
+  closeBtn:   { backgroundColor: '#f9a825', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  closeTxt:   { fontSize: 16, fontWeight: '800', color: '#fff' },
+});
+
 export default function Stats() {
-  const { state, bps, devJumpToAge } = useGameContext();
+  const { state, bps, devJumpToAge, giftBananas } = useGameContext();
+  const [showAchievements, setShowAchievements] = useState(false);
 
   const totalUpgradesBought = Object.values(state.upgrades).reduce(
     (sum, count) => sum + count,
@@ -117,14 +177,20 @@ export default function Stats() {
           </>
         )}
 
-        {state.unlockedAchievements.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Succès</Text>
-            {ACHIEVEMENTS.filter(a => state.unlockedAchievements.includes(a.id)).map(a => (
-              <StatCard key={a.id} emoji="🏆" label={a.title} value={a.description} />
-            ))}
-          </>
-        )}
+        <Text style={styles.sectionTitle}>Succès</Text>
+        <Pressable style={styles.achievementsBtn} onPress={() => setShowAchievements(true)}>
+          <Text style={styles.achievementsBtnEmoji}>🏆</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.achievementsBtnTitle}>Voir mes succès</Text>
+            <Text style={styles.achievementsBtnSub}>{state.unlockedAchievements.length}/{ACHIEVEMENTS.length} débloqués</Text>
+          </View>
+          <Text style={styles.achievementsBtnArrow}>→</Text>
+        </Pressable>
+        <AchievementsModal
+          visible={showAchievements}
+          onClose={() => setShowAchievements(false)}
+          unlockedIds={state.unlockedAchievements}
+        />
         {/* Debug */}
         <Text style={styles.sectionTitle}>🛠 Debug</Text>
         <View style={styles.debugRow}>
@@ -139,6 +205,9 @@ export default function Stats() {
             </Pressable>
           ))}
         </View>
+        <Pressable style={styles.debugBananaBtn} onPress={() => giftBananas(999_999_999_999)}>
+          <Text style={styles.debugBananaBtnTxt}>💰 +999 milliards 🍌</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -169,6 +238,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 4,
   },
+  achievementsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'rgba(255,215,0,0.12)',
+    borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)',
+    marginBottom: 8,
+  },
+  achievementsBtnEmoji: { fontSize: 28 },
+  achievementsBtnTitle: { fontSize: 15, fontWeight: '700', color: '#3e2723' },
+  achievementsBtnSub:   { fontSize: 12, color: '#8d6e63', marginTop: 2 },
+  achievementsBtnArrow: { fontSize: 18, color: '#f9a825', fontWeight: '700' },
   debugRow: {
     flexDirection: 'row',
     gap: 8,
@@ -190,4 +270,10 @@ const styles = StyleSheet.create({
   },
   debugBtnTxt:   { fontSize: 20 },
   debugBtnLabel: { fontSize: 11, color: '#888', marginTop: 2 },
+  debugBananaBtn: {
+    backgroundColor: '#1a3a00', borderRadius: 10,
+    padding: 12, alignItems: 'center', marginTop: 8,
+    borderWidth: 1, borderColor: '#f9a825',
+  },
+  debugBananaBtnTxt: { fontSize: 15, fontWeight: '700', color: '#f9a825' },
 });

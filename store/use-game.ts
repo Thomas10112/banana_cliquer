@@ -1,17 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { getBps, gameReducer, INITIAL_STATE } from './game-reducer';
 import { ACHIEVEMENTS } from './achievements-config';
+import { getZoneMaxStock } from './zones-config';
 
 const SAVE_KEY = 'banana_clicker_v1';
 const TICK_MS  = 100;
 const SAVE_DEBOUNCE_MS = 2000;
+const OFFLINE_MIN_SECONDS = 60;
+const OFFLINE_CAP_SECONDS = 4 * 3600;
 
 export function useGame(weatherMultiplier: number = 1) {
   const [state, dispatch] = useReducer(gameReducer, INITIAL_STATE);
-  const weatherRef  = useRef(weatherMultiplier);
-  const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
-  const loadedRef   = useRef(false);
+  const [pendingOfflineGains, setPendingOfflineGains] = useState(0);
+  const [pendingOfflineSeconds, setPendingOfflineSeconds] = useState(0);
+  const [zoneFullQueue, setZoneFullQueue] = useState<string[]>([]);
+  const weatherRef   = useRef(weatherMultiplier);
+  const saveTimeout  = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const loadedRef    = useRef(false);
+  const prevStocksRef     = useRef<Record<string, number>>({});
+  const achievementTimer  = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const stateRef          = useRef(state);
 
   useEffect(() => { weatherRef.current = weatherMultiplier; }, [weatherMultiplier]);
 
@@ -22,6 +31,20 @@ export function useGame(weatherMultiplier: number = 1) {
         try {
           const saved = JSON.parse(raw);
           dispatch({ type: 'LOAD_SAVE', payload: saved });
+
+          if (saved.lastSavedAt > 0) {
+            const elapsed = (Date.now() - saved.lastSavedAt) / 1000;
+            const capped  = Math.min(elapsed, OFFLINE_CAP_SECONDS);
+            if (capped >= OFFLINE_MIN_SECONDS) {
+              const bps    = getBps({ ...INITIAL_STATE, ...saved });
+              const gains  = Math.floor(bps * capped);
+              if (gains > 0) {
+                dispatch({ type: 'ADD_OFFLINE_GAINS', amount: gains });
+                setPendingOfflineGains(gains);
+                setPendingOfflineSeconds(Math.floor(capped));
+              }
+            }
+          }
         } catch {}
       }
       loadedRef.current = true;
@@ -33,7 +56,7 @@ export function useGame(weatherMultiplier: number = 1) {
     if (!loadedRef.current) return;
     clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
-      AsyncStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, lastSavedAt: Date.now() }));
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(saveTimeout.current);
   }, [state]);
@@ -46,19 +69,40 @@ export function useGame(weatherMultiplier: number = 1) {
     return () => clearInterval(id);
   }, []);
 
-  // ── Succès ──
+  // ── Détection zones pleines ──
   useEffect(() => {
-    ACHIEVEMENTS.forEach(a => {
-      if (!state.unlockedAchievements.includes(a.id) && a.check(state)) {
-        dispatch({ type: 'UNLOCK_ACHIEVEMENT', id: a.id });
-      }
+    if (!loadedRef.current) return;
+    const prev = prevStocksRef.current;
+    const newFull: string[] = [];
+    Object.entries(state.zoneStocks).forEach(([id, stock]) => {
+      const level = state.zoneLevels[id] ?? 0;
+      if (level < 1) return;
+      const max = getZoneMaxStock(level);
+      if (max > 0 && stock >= max && (prev[id] ?? 0) < max) newFull.push(id);
     });
-  }, [state]);
+    if (newFull.length > 0) setZoneFullQueue(q => [...q, ...newFull]);
+    prevStocksRef.current = { ...state.zoneStocks };
+  }, [state.zoneStocks]);
+
+  // ── Succès (throttlé à 500ms) ──
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  useEffect(() => {
+    achievementTimer.current = setInterval(() => {
+      const s = stateRef.current;
+      const newIds = ACHIEVEMENTS
+        .filter(a => !s.unlockedAchievements.includes(a.id) && a.check(s))
+        .map(a => a.id);
+      if (newIds.length > 0) dispatch({ type: 'UNLOCK_ACHIEVEMENTS_BATCH', ids: newIds });
+    }, 500);
+    return () => clearInterval(achievementTimer.current);
+  }, []);
 
   const bps = getBps(state) * weatherRef.current;
 
   const click         = useCallback((comboMultiplier?: number) => dispatch({ type: 'CLICK', comboMultiplier }), []);
-  const buyUpgrade    = useCallback((id: string) => dispatch({ type: 'BUY_UPGRADE', id }), []);
+  const buyUpgrade     = useCallback((id: string) => dispatch({ type: 'BUY_UPGRADE', id }), []);
+  const bulkBuyUpgrade = useCallback((id: string, quantity: number) => dispatch({ type: 'BUY_UPGRADE_BULK', id, quantity }), []);
   const claimQuest    = useCallback((id: string) => dispatch({ type: 'CLAIM_QUEST', id }), []);
   const migrate       = useCallback(() => dispatch({ type: 'GRANDE_MIGRATION' }), []);
   const collectGolden = useCallback(() => dispatch({ type: 'COLLECT_GOLDEN' }), []);
@@ -66,14 +110,30 @@ export function useGame(weatherMultiplier: number = 1) {
   const upgradeZone   = useCallback((id: string) => dispatch({ type: 'UPGRADE_ZONE', id }), []);
   const harvestZone   = useCallback((id: string) => dispatch({ type: 'HARVEST_ZONE', id }), []);
   const buyWhale        = useCallback(() => dispatch({ type: 'BUY_WHALE' }), []);
-  const activateBooster = useCallback(() => dispatch({ type: 'ACTIVATE_BOOSTER' }), []);
+  const activateBooster  = useCallback(() => dispatch({ type: 'ACTIVATE_BOOSTER' }), []);
+  const upgradeAutoClick = useCallback(() => dispatch({ type: 'UPGRADE_AUTO_CLICK' }), []);
   const devJumpToAge    = useCallback((age: number) => dispatch({
     type: 'LOAD_SAVE',
-    payload: { ...INITIAL_STATE, currentAge: age, totalMigrations: age * 3, bananas: 999999, totalBananas: 999999 },
+    payload: { ...INITIAL_STATE, currentAge: age, totalMigrations: age * 3, bananas: 1_000_000_000_000, totalBananas: 1_000_000_000_000 },
   }), []);
+  const giftBananas = useCallback((amount: number) => {
+    dispatch({ type: 'ADD_OFFLINE_GAINS', amount });
+  }, []);
+  const claimOfflineGains = useCallback(() => {
+    setPendingOfflineGains(0);
+    setPendingOfflineSeconds(0);
+  }, []);
+  const [justReset, setJustReset] = useState(false);
+  const resetGame = useCallback(() => {
+    dispatch({ type: 'LOAD_SAVE', payload: INITIAL_STATE });
+    setJustReset(true);
+  }, []);
+  const clearJustReset = useCallback(() => setJustReset(false), []);
 
   const isBoosterActive = state.playTimeSeconds < state.boosterLastUsed + 120;
   const boosterCooldownLeft = Math.max(0, state.boosterLastUsed + 600 - state.playTimeSeconds);
 
-  return { state, bps, click, buyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge };
+  const dismissZoneFull = useCallback(() => setZoneFullQueue(q => q.slice(1)), []);
+
+  return { state, bps, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull };
 }

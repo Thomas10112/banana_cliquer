@@ -57,4 +57,28 @@ export const ZONES: ZoneConfig[] = [
   { id: 'orient',    minAge: 1, cost: 7000,  bonus: { bpsMultiplier: 0.20 } },
   { id: 'pacifique', minAge: 1, cost: 15000, bonus: { clickBonus: 8 } },
   { id: 'epices',    minAge: 1, cost: 30000, bonus: { bpsMultiplier: 0.25 } },
+
+  // ── Ère Industrielle (age 2) ──────────────────────────────────────────────
+  { id: 'angleterre',   minAge: 2, cost: 50000,    bonus: { clickBonus: 20 } },
+  { id: 'ruhr',         minAge: 2, cost: 150000,   bonus: { bpsMultiplier: 0.15 } },
+  { id: 'pennsylvanie', minAge: 2, cost: 400000,   bonus: { clickBonus: 50 } },
+  { id: 'detroit',      minAge: 2, cost: 1000000,  bonus: { bpsMultiplier: 0.20 } },
+  { id: 'siberien',     minAge: 2, cost: 3000000,  bonus: { bpsMultiplier: 0.25 } },
+  { id: 'bombay',       minAge: 2, cost: 8000000,  bonus: { clickBonus: 100 } },
+
+  // ── Ère Moderne (age 3) ───────────────────────────────────────────────────
+  { id: 'silicon_valley', minAge: 3, cost: 20000000,    bonus: { clickBonus: 200 } },
+  { id: 'geneve',         minAge: 3, cost: 60000000,    bonus: { bpsMultiplier: 0.30 } },
+  { id: 'seoul',          minAge: 3, cost: 150000000,   bonus: { clickBonus: 300 } },
+  { id: 'bangalore',      minAge: 3, cost: 400000000,   bonus: { bpsMultiplier: 0.35 } },
+  { id: 'houston',        minAge: 3, cost: 1200000000,  bonus: { bpsMultiplier: 0.40 } },
+  { id: 'tokyo',          minAge: 3, cost: 4000000000,  bonus: { clickBonus: 500 } },
+
+  // ── Ère Robotique (age 4) ─────────────────────────────────────────────────
+  { id: 'californie_2050', minAge: 4, cost: 10000000000,    bonus: { clickBonus: 800 } },
+  { id: 'dubai_nexus',     minAge: 4, cost: 30000000000,    bonus: { bpsMultiplier: 0.45 } },
+  { id: 'singapour_ia',    minAge: 4, cost: 100000000000,   bonus: { clickBonus: 1000 } },
+  { id: 'cite_polaire',    minAge: 4, cost: 300000000000,   bonus: { bpsMultiplier: 0.50 } },
+  { id: 'sao_paulo_mech',  minAge: 4, cost: 1000000000000,  bonus: { clickBonus: 1500 } },
+  { id: 'neo_tokyo',       minAge: 4, cost: 5000000000000,  bonus: { bpsMultiplier: 0.60 } },
 ];

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -13,6 +14,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGameContext } from '@/store/game-context';
 import { AGES } from '@/store/ages-config';
+import { registerTutorialRef } from '@/utils/tutorial-refs';
 import { ZONES, zoneBonusLabel, getZoneUpgradeCost, getZoneMaxStock, getWhaleCost } from '@/store/zones-config';
 import { formatBananas } from '@/utils/format-bananas';
 import type { WhaleTrip } from '@/store/types';
@@ -72,17 +74,17 @@ const AGE_POIS: Record<number, POI[]> = {
       description: 'Un troupeau de mammouths laineux migre vers le sud. Attention à ne pas te retrouver sur leur chemin.' },
   ],
   1: [
-    { id: 'nil',       label: 'Champs du Nil',        emoji: '🌾', xPct: 0.57, yPct: 0.43,
+    { id: 'nil',       label: 'Champs du Nil',        emoji: '🌾', xPct: 0.52, yPct: 0.43,
       description: 'Les crues du Nil fertilisent ces plaines dorées. Jamais une récolte de bananes n\'a été aussi abondante.' },
-    { id: 'flandre',   label: 'Moulin de Flandre',    emoji: '⚙️', xPct: 0.48, yPct: 0.18,
+    { id: 'flandre',   label: 'Moulin de Flandre',    emoji: '⚙️', xPct: 0.48, yPct: 0.24,
       description: 'Les moulins tournent nuit et jour. Le vent du nord broie, mélange, et transforme tout ce qui passe.' },
-    { id: 'andine',    label: 'Ferme Andine',          emoji: '🏡', xPct: 0.20, yPct: 0.70,
+    { id: 'andine',    label: 'Ferme Andine',          emoji: '🏡', xPct: 0.28, yPct: 0.70,
       description: 'Accrochée aux flancs des Andes, cette ferme cultive des bananes en terrasses depuis des siècles.' },
-    { id: 'orient',    label: 'Grenier d\'Orient',     emoji: '🏺', xPct: 0.78, yPct: 0.33,
+    { id: 'orient',    label: 'Grenier d\'Orient',     emoji: '🏺', xPct: 0.60, yPct: 0.33,
       description: 'D\'immenses greniers stockent les récoltes de tout le continent. La route des épices passe par ici.' },
-    { id: 'pacifique', label: 'Domaine du Pacifique',  emoji: '🌿', xPct: 0.84, yPct: 0.65,
+    { id: 'pacifique', label: 'Domaine du Pacifique',  emoji: '🌿', xPct: 0.03, yPct: 0.55,
       description: 'Sur cette île fertile au milieu du Pacifique, les bananiers poussent sans effort toute l\'année.' },
-    { id: 'epices',    label: 'Île des Épices',        emoji: '🌺', xPct: 0.51, yPct: 0.60,
+    { id: 'epices',    label: 'Île des Épices',        emoji: '🌺', xPct: 0.65, yPct: 0.79,
       description: 'Une île mystérieuse surgit des eaux. Ses épices rares donnent un goût unique aux bananes locales.' },
   ],
   2: [
@@ -99,18 +101,55 @@ const AGE_POIS: Record<number, POI[]> = {
     { id: 'bombay',      label: 'Port de Bombay',         emoji: '⚓',  xPct: 0.72, yPct: 0.50,
       description: 'Des bateaux à vapeur chargés de bananes quittent ce port immense vers tous les continents.' },
   ],
-  3: [], 4: [],
+  3: [
+    { id: 'silicon_valley', label: 'Silicon Valley',    emoji: '💻', xPct: 0.18, yPct: 0.34,
+      description: 'Des garages aux serveurs géants, chaque ligne de code ici peut changer la valeur mondiale de la banane.' },
+    { id: 'geneve',         label: 'CERN — Genève',     emoji: '🔬', xPct: 0.50, yPct: 0.24,
+      description: 'Des physiciens cherchent à comprendre l\'univers. En attendant, leurs supercalculateurs optimisent la production bananière.' },
+    { id: 'seoul',          label: 'Seoul Tech Park',   emoji: '📱', xPct: 0.82, yPct: 0.27,
+      description: 'Puces, écrans, robots. Cette mégapole produit les composants qui font tourner toutes les usines à bananes du monde.' },
+    { id: 'bangalore',      label: 'Bangalore Digital', emoji: '🛰️', xPct: 0.71, yPct: 0.41,
+      description: 'Des milliers d\'ingénieurs logiciels coordonnent depuis ici les drones de livraison de bananes en temps réel.' },
+    { id: 'houston',        label: 'Centre Spatial',    emoji: '🚀', xPct: 0.08, yPct: 0.65,
+      description: 'De là sont lancés les satellites qui cartographient chaque plantation bananière sur Terre depuis l\'orbite basse.' },
+    { id: 'tokyo',          label: 'Tokyo Numérique',   emoji: '🖥️', xPct: 0.85, yPct: 0.33,
+      description: 'La ville la plus connectée du monde. Ici, des IA ultra-perfectionnées gèrent la distribution mondiale des bananes.' },
+  ],
+  4: [
+    { id: 'californie_2050', label: 'Californie 2050',  emoji: '🌆', xPct: 0.20, yPct: 0.35,
+      description: 'Les anciennes Silicon Valley et Los Angeles ont fusionné en une mégapole entièrement automatisée. Chaque banane est cueillie par un bras robotique.' },
+    { id: 'dubai_nexus',     label: 'Dubai Nexus',      emoji: '🏙️', xPct: 0.62, yPct: 0.40,
+      description: 'Des tours d\'acier et de verre abritent les supercalculateurs qui gèrent la logistique bananière mondiale en temps réel.' },
+    { id: 'singapour_ia',    label: 'Singapour IA',     emoji: '🧠', xPct: 0.78, yPct: 0.48,
+      description: 'La première ville entièrement gérée par une intelligence artificielle. Elle a décidé que la banane est la denrée prioritaire.' },
+    { id: 'cite_polaire',    label: 'Cité Polaire',     emoji: '❄️', xPct: 0.50, yPct: 0.04,
+      description: 'Des datacenters enfouis sous la glace arctique calculent en permanence l\'optimum bananier mondial grâce au froid naturel.' },
+    { id: 'sao_paulo_mech',  label: 'São Paulo Mech',   emoji: '⚙️', xPct: 0.30, yPct: 0.65,
+      description: 'D\'immenses usines robotisées transforment l\'Amazonie en la plus grande plantation bananière automatisée de l\'histoire.' },
+    { id: 'neo_tokyo',       label: 'Néo-Tokyo',        emoji: '🤖', xPct: 0.85, yPct: 0.30,
+      description: 'Des robots humanoïdes de dernière génération envahissent les rues. Leur unique mission : produire et livrer des bananes.' },
+  ],
 };
 
 const AGE_MAPS: Record<number, any> = {
-  0: require('@/assets/images/map_ere_sauvage.png'),
-  1: require('@/assets/images/map_ere_agricole.png'),
-  2: require('@/assets/images/map_ere_industrielle.png'),
+  0: require('@/assets/images/maps/map_ere_sauvage.png'),
+  1: require('@/assets/images/maps/map_ere_agricole.png'),
+  2: require('@/assets/images/maps/map_ere_industrielle.png'),
+  3: require('@/assets/images/maps/map_ere_moderne.png'),
+  4: require('@/assets/images/maps/map_ere_robotique.png'),
+};
+
+const AGE_TRANSPORT: Record<number, { emoji: string; article: string; name: string; namePlural: string }> = {
+  0: { emoji: '🐋', article: 'une', name: 'baleine porteuse',    namePlural: 'baleines actives' },
+  1: { emoji: '⛵', article: 'un',  name: 'voilier marchand',    namePlural: 'voiliers actifs' },
+  2: { emoji: '🚂', article: 'une', name: 'locomotive',          namePlural: 'locomotives actives' },
+  3: { emoji: '✈️', article: 'un',  name: 'avion cargo',         namePlural: 'avions actifs' },
+  4: { emoji: '🛸', article: 'un',  name: 'vaisseau logistique', namePlural: 'vaisseaux actifs' },
 };
 
 // ─── Whale animated marker ────────────────────────────────────────────────────
 
-function WhaleMarker({ trip, pois, playTime }: { trip: WhaleTrip; pois: POI[]; playTime: number }) {
+function WhaleMarker({ trip, pois, playTime, transportEmoji }: { trip: WhaleTrip; pois: POI[]; playTime: number; transportEmoji: string }) {
   const fromPOI = pois.find(p => p.id === trip.fromZoneId);
   const toPOI   = pois.find(p => p.id === trip.toZoneId);
   if (!fromPOI || !toPOI) return null;
@@ -135,7 +174,7 @@ function WhaleMarker({ trip, pois, playTime }: { trip: WhaleTrip; pois: POI[]; p
 
   return (
     <Animated.View style={[{ position: 'absolute', left: 0, top: 0 }, style]} pointerEvents="none">
-      <Text style={{ fontSize: 22, transform: [{ scaleX: goingRight ? 1 : -1 }] }}>🐋</Text>
+      <Text style={{ fontSize: 22, transform: [{ scaleX: goingRight ? 1 : -1 }] }}>{transportEmoji}</Text>
     </Animated.View>
   );
 }
@@ -280,12 +319,13 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
 
 // ─── Territory summary panel ──────────────────────────────────────────────────
 
-function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, onClose, onSelect, onBuyWhale }: {
+function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, transport, onClose, onSelect, onBuyWhale }: {
   pois: POI[];
   zoneLevels: Record<string, number>;
   zoneStocks: Record<string, number>;
   bananas: number;
   whalesOwned: number;
+  transport: { emoji: string; article: string; name: string; namePlural: string };
   onClose: () => void;
   onSelect: (poi: POI) => void;
   onBuyWhale: () => void;
@@ -300,21 +340,21 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, on
       <View style={styles.panelCard}>
         <Text style={styles.panelTitle}>🗺️ Territoires de l'âge</Text>
 
-        {/* Baleine */}
+        {/* Transport */}
         <Pressable
           style={[styles.whaleBtn, !canBuyWhale && styles.whaleBtnDisabled]}
           onPress={() => { if (canBuyWhale) { onBuyWhale(); onClose(); } }}
         >
-          <Text style={styles.whaleBtnEmoji}>🐋</Text>
+          <Text style={styles.whaleBtnEmoji}>{transport.emoji}</Text>
           <View>
             <Text style={styles.whaleBtnTxt}>
               {canBuyWhale
-                ? `Acheter une baleine porteuse — ${formatBananas(whaleCost)} 🍌`
+                ? `Acheter ${transport.article} ${transport.name} — ${formatBananas(whaleCost)} 🍌`
                 : conqueredCount < 2
                   ? '🔒 Conquiers 2 zones pour débloquer'
                   : `🔒 ${formatBananas(whaleCost)} 🍌 requis`}
             </Text>
-            {whalesOwned > 0 && <Text style={styles.whaleBtnSub}>{whalesOwned} baleine{whalesOwned > 1 ? 's' : ''} active{whalesOwned > 1 ? 's' : ''}</Text>}
+            {whalesOwned > 0 && <Text style={styles.whaleBtnSub}>{whalesOwned} {transport.namePlural}</Text>}
           </View>
         </Pressable>
 
@@ -364,13 +404,29 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, on
 
 export default function WorldMapScreen() {
   const { state, conquerZone, upgradeZone, harvestZone, buyWhale } = useGameContext();
+  const mapAreaRef    = useRef<View>(null);
+  const mapPanelBtnRef = useRef<any>(null);
+  const firstPoiRef   = useRef<View>(null);
+  useEffect(() => {
+    registerTutorialRef('mapArea',     mapAreaRef);
+    registerTutorialRef('mapPanelBtn', mapPanelBtnRef);
+    registerTutorialRef('firstPoi',    firstPoiRef);
+  }, []);
   const [selectedPOI, setSelectedPOI]         = useState<POI | null>(null);
   const [showTerritories, setShowTerritories]  = useState(false);
   const [indicators, setIndicators]            = useState<IndicatorData[]>([]);
+  const [mapLoaded, setMapLoaded]              = useState(false);
 
-  const age    = AGES[state.currentAge];
-  const mapSrc = AGE_MAPS[state.currentAge];
-  const pois   = AGE_POIS[state.currentAge] ?? [];
+  const age       = AGES[state.currentAge];
+  const mapSrc    = AGE_MAPS[state.currentAge];
+  const pois      = AGE_POIS[state.currentAge] ?? [];
+  const transport = AGE_TRANSPORT[state.currentAge] ?? AGE_TRANSPORT[0];
+
+  useEffect(() => {
+    setMapLoaded(false);
+    const fallback = setTimeout(() => setMapLoaded(true), 800);
+    return () => clearTimeout(fallback);
+  }, [state.currentAge]);
 
   const scale      = useSharedValue(FIT_SCALE);
   const savedScale = useSharedValue(FIT_SCALE);
@@ -453,10 +509,16 @@ export default function WorldMapScreen() {
   return (
     <View style={styles.root}>
       <GestureDetector gesture={gesture}>
-        <View style={styles.viewport}>
+        <View ref={mapAreaRef} style={styles.viewport}>
           <Animated.View style={[styles.mapInner, animStyle]}>
             {mapSrc ? (
-              <Image source={mapSrc} style={styles.mapImage} resizeMode="cover" />
+              <ExpoImage
+                source={mapSrc}
+                style={styles.mapImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                onLoad={() => setMapLoaded(true)}
+              />
             ) : (
               <View style={[styles.mapImage, styles.mapPlaceholder]}>
                 <Text style={styles.placeholderEmoji}>🗺️</Text>
@@ -464,15 +526,30 @@ export default function WorldMapScreen() {
               </View>
             )}
 
-            {/* Baleines animées */}
+            {/* Transports animés */}
             {state.activeWhales.map(trip => (
               <WhaleMarker
                 key={trip.id}
                 trip={trip}
                 pois={pois}
                 playTime={state.playTimeSeconds}
+                transportEmoji={transport.emoji}
               />
             ))}
+
+            {/* Ref tutorial sur le premier POI */}
+            {pois[0] && (
+              <View
+                ref={firstPoiRef}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: pois[0].xPct * MAP_W - 28,
+                  top:  pois[0].yPct * MAP_H - 48,
+                  width: 56, height: 56,
+                }}
+              />
+            )}
 
             {/* Marqueurs de zones */}
             {pois.map(poi => (
@@ -490,9 +567,19 @@ export default function WorldMapScreen() {
       </GestureDetector>
 
       {/* Bulles hors-écran */}
-      {indicators.map(ind => (
+      {mapLoaded && indicators.map(ind => (
         <OffScreenBubble key={ind.id} ind={ind} onPress={() => scrollToPOI(ind.poi)} />
       ))}
+
+      {/* Overlay chargement carte */}
+      {!mapLoaded && mapSrc && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingEmoji}>{age?.emoji ?? '🗺️'}</Text>
+          <Text style={styles.loadingName}>{age?.name}</Text>
+          <ActivityIndicator color="rgba(255,255,255,0.6)" style={{ marginTop: 16 }} />
+          <Text style={styles.loadingTxt}>Chargement de la carte…</Text>
+        </View>
+      )}
 
       {/* Header */}
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="box-none">
@@ -501,7 +588,7 @@ export default function WorldMapScreen() {
             <Text style={styles.ageEmoji}>{age?.emoji}</Text>
             <Text style={styles.ageName}>{age?.name}</Text>
           </View>
-          <Pressable style={styles.iconBtn} onPress={() => setShowTerritories(true)}>
+          <Pressable ref={mapPanelBtnRef} style={styles.iconBtn} onPress={() => setShowTerritories(true)}>
             <Text style={styles.iconBtnTxt}>📋</Text>
             {conqueredCount > 0 && (
               <View style={styles.conqueredPill}>
@@ -511,7 +598,7 @@ export default function WorldMapScreen() {
           </Pressable>
           {state.whalesOwned > 0 && (
             <View style={styles.whaleCountBadge}>
-              <Text style={styles.iconBtnTxt}>🐋</Text>
+              <Text style={styles.iconBtnTxt}>{transport.emoji}</Text>
               <Text style={styles.whaleCountTxt}>{state.whalesOwned}</Text>
             </View>
           )}
@@ -544,6 +631,7 @@ export default function WorldMapScreen() {
           zoneStocks={state.zoneStocks}
           bananas={state.bananas}
           whalesOwned={state.whalesOwned}
+          transport={transport}
           onClose={() => setShowTerritories(false)}
           onSelect={(poi) => { scrollToPOI(poi); setSelectedPOI(poi); }}
           onBuyWhale={buyWhale}
@@ -563,6 +651,17 @@ const styles = StyleSheet.create({
   mapPlaceholder: { backgroundColor: '#1a3050', alignItems: 'center', justifyContent: 'center', gap: 12 },
   placeholderEmoji: { fontSize: 48 },
   placeholderTxt:   { fontSize: 18, color: '#aaa', fontWeight: '600' },
+
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a1628',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingEmoji: { fontSize: 64 },
+  loadingName:  { fontSize: 20, fontWeight: '800', color: '#fff', marginTop: 4 },
+  loadingTxt:   { fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 4 },
 
   // Markers
   marker:     { position: 'absolute', alignItems: 'center', gap: 1 },

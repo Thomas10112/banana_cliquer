@@ -94,7 +94,7 @@ function Snowflake({ containerWidth, containerHeight, delay }: FlakeProps) {
 
 function LightningFlash() {
   const opacity   = useSharedValue(0);
-  const timeout   = useRef<ReturnType<typeof setTimeout>>();
+  const timeout   = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     function schedule() {

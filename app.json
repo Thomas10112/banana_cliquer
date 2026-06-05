@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "projet_react_native",
+    "name": "Banana Punch",
     "slug": "projet_react_native",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "projetreactnative",
+    "scheme": "bananapunch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.carotto.bananaclicker",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +20,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -45,11 +52,34 @@
           }
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Utilisé pour choisir ta photo de profil."
+        }
+      ],
+      "expo-asset"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/4d6f3bb1-7784-466d-a30a-7337c7c57b46",
+      "enabled": true,
+      "fallbackToCacheTimeout": 3000,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4d6f3bb1-7784-466d-a30a-7337c7c57b46"
+      }
+    },
+    "owner": "carotto"
   }
 }

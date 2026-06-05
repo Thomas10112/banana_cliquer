@@ -40,6 +40,12 @@ export interface GameState {
   boosterUnlocked: boolean;
   boosterLastUsed: number;
   comboUnlocked: boolean;
+  // Gains hors-ligne
+  lastSavedAt: number;
+  // Auto-clic
+  autoClickLevel: number; // 0=inactif, 1-3
+  // Stats lifetime
+  totalClicks: number;
 }
 
 export type GameAction =
@@ -49,10 +55,14 @@ export type GameAction =
   | { type: 'CLAIM_QUEST'; id: string }
   | { type: 'GRANDE_MIGRATION' }
   | { type: 'UNLOCK_ACHIEVEMENT'; id: string }
+  | { type: 'UNLOCK_ACHIEVEMENTS_BATCH'; ids: string[] }
   | { type: 'COLLECT_GOLDEN' }
   | { type: 'CONQUER_ZONE'; id: string }
   | { type: 'UPGRADE_ZONE'; id: string }
   | { type: 'HARVEST_ZONE'; id: string }
   | { type: 'BUY_WHALE' }
   | { type: 'ACTIVATE_BOOSTER' }
+  | { type: 'BUY_UPGRADE_BULK'; id: string; quantity: number }
+  | { type: 'UPGRADE_AUTO_CLICK' }
+  | { type: 'ADD_OFFLINE_GAINS'; amount: number }
   | { type: 'LOAD_SAVE'; payload: Partial<GameState> };
