@@ -319,7 +319,7 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
 
 // ─── Territory summary panel ──────────────────────────────────────────────────
 
-function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, transport, onClose, onSelect, onBuyWhale }: {
+function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, transport, onClose, onSelect, onConquer, onUpgrade, onBuyWhale }: {
   pois: POI[];
   zoneLevels: Record<string, number>;
   zoneStocks: Record<string, number>;
@@ -328,6 +328,8 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
   transport: { emoji: string; article: string; name: string; namePlural: string };
   onClose: () => void;
   onSelect: (poi: POI) => void;
+  onConquer: (id: string) => void;
+  onUpgrade: (id: string) => void;
   onBuyWhale: () => void;
 }) {
   const conqueredCount = pois.filter(p => (zoneLevels[p.id] ?? 0) >= 1).length;
@@ -338,9 +340,8 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
     <View style={styles.panelOverlay} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={styles.panelCard}>
-        <Text style={styles.panelTitle}>🗺️ Territoires de l'âge</Text>
+        <Text style={styles.panelTitle}>🗺️ Territoires — {conqueredCount}/{pois.length}</Text>
 
-        {/* Transport */}
         <Pressable
           style={[styles.whaleBtn, !canBuyWhale && styles.whaleBtnDisabled]}
           onPress={() => { if (canBuyWhale) { onBuyWhale(); onClose(); } }}
@@ -358,23 +359,44 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
           </View>
         </Pressable>
 
-        <Text style={styles.panelSub}>Tap pour naviguer vers une zone</Text>
         <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false}>
           {pois.map(poi => {
-            const zone       = ZONES.find(z => z.id === poi.id);
-            const level      = zoneLevels[poi.id] ?? 0;
-            const stock      = zoneStocks[poi.id] ?? 0;
-            const isConquered = level >= 1;
-            const canAfford  = zone ? bananas >= zone.cost : false;
+            const zone         = ZONES.find(z => z.id === poi.id);
+            const level        = zoneLevels[poi.id] ?? 0;
+            const stock        = zoneStocks[poi.id] ?? 0;
+            const isConquered  = level >= 1;
+            const isMaxed      = level >= 3;
+            const upgradeCost  = (!isMaxed && zone) ? getZoneUpgradeCost(zone, level) : 0;
+
+            const canConquer   = !isConquered && !!zone && bananas >= zone.cost;
+            const cantConquer  = !isConquered && !!zone && bananas < zone.cost;
+            const canUpgradeNow = isConquered && !isMaxed && bananas >= upgradeCost;
+
+            const isAffordable = canConquer || canUpgradeNow;
+            const isCantAfford = cantConquer || (isConquered && !isMaxed && bananas < upgradeCost);
+
             return (
               <Pressable
                 key={poi.id}
-                style={[styles.panelRow, isConquered && styles.panelRowConquered]}
+                style={[
+                  styles.panelRow,
+                  isConquered   && styles.panelRowConquered,
+                  isAffordable  && styles.panelRowAffordable,
+                  isCantAfford  && styles.panelRowCantAfford,
+                ]}
                 onPress={() => { onClose(); onSelect(poi); }}
               >
+                {/* Icône état */}
+                <Text style={styles.panelRowStateIcon}>
+                  {!isConquered ? '🔨' : isMaxed ? '✅' : '⬆️'}
+                </Text>
+
                 <Text style={styles.panelRowEmoji}>{poi.emoji}</Text>
+
                 <View style={styles.panelRowInfo}>
-                  <Text style={styles.panelRowName}>{poi.label}</Text>
+                  <Text style={[styles.panelRowName, isCantAfford && styles.panelRowNameDim]}>
+                    {poi.label}
+                  </Text>
                   {zone && (
                     <Text style={[styles.panelRowBonus, isConquered && styles.panelRowBonusConquered]}>
                       {isConquered
@@ -382,11 +404,29 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
                         : `${formatBananas(zone.cost)} 🍌 · ${zoneBonusLabel(zone.bonus)}`}
                     </Text>
                   )}
+                  {isConquered && !isMaxed && (
+                    <Text style={[styles.panelRowBonus, canUpgradeNow && { color: '#ffd700' }]}>
+                      Améliorer : {formatBananas(upgradeCost)} 🍌
+                    </Text>
+                  )}
                 </View>
-                {!isConquered && (
-                  <View style={[styles.panelAffordBadge, canAfford && styles.panelAffordBadgeReady]}>
-                    <Text style={styles.panelAffordTxt}>{canAfford ? '✓' : '🔒'}</Text>
-                  </View>
+
+                {/* Bouton action direct */}
+                {canConquer && (
+                  <Pressable
+                    style={styles.panelActionBtn}
+                    onPress={(e) => { e.stopPropagation?.(); onConquer(poi.id); }}
+                  >
+                    <Text style={styles.panelActionTxt}>🔨</Text>
+                  </Pressable>
+                )}
+                {canUpgradeNow && (
+                  <Pressable
+                    style={[styles.panelActionBtn, styles.panelUpgradeBtn]}
+                    onPress={(e) => { e.stopPropagation?.(); onUpgrade(poi.id); }}
+                  >
+                    <Text style={styles.panelActionTxt}>⬆️</Text>
+                  </Pressable>
                 )}
               </Pressable>
             );
@@ -633,6 +673,8 @@ export default function WorldMapScreen() {
           transport={transport}
           onClose={() => setShowTerritories(false)}
           onSelect={(poi) => { scrollToPOI(poi); setSelectedPOI(poi); }}
+          onConquer={(id) => conquerZone(id)}
+          onUpgrade={(id) => upgradeZone(id)}
           onBuyWhale={buyWhale}
         />
       )}
@@ -753,15 +795,19 @@ const styles = StyleSheet.create({
   whaleBtnTxt:   { fontSize: 13, fontWeight: '700', color: '#fff', flexShrink: 1 },
   whaleBtnSub:   { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
   panelScroll: { flexGrow: 0 },
-  panelRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 12, marginBottom: 8 },
-  panelRowConquered:      { backgroundColor: 'rgba(180,120,0,0.15)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)' },
-  panelRowEmoji:          { fontSize: 28 },
-  panelRowInfo:           { flex: 1 },
-  panelRowName:           { fontSize: 14, fontWeight: '700', color: '#fff' },
-  panelRowBonus:          { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  panelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
+  panelRowConquered:   { backgroundColor: 'rgba(180,120,0,0.15)', borderColor: 'rgba(255,215,0,0.2)' },
+  panelRowAffordable:  { backgroundColor: 'rgba(249,168,37,0.15)', borderColor: 'rgba(255,215,0,0.6)' },
+  panelRowCantAfford:  { opacity: 0.45 },
+  panelRowStateIcon:   { fontSize: 18, width: 24, textAlign: 'center' },
+  panelRowEmoji:       { fontSize: 26 },
+  panelRowInfo:        { flex: 1 },
+  panelRowName:        { fontSize: 14, fontWeight: '700', color: '#fff' },
+  panelRowNameDim:     { color: 'rgba(255,255,255,0.5)' },
+  panelRowBonus:          { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
   panelRowBonusConquered: { color: '#ffd700' },
-  panelAffordBadge:       { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  panelAffordBadgeReady:  { backgroundColor: '#2e7d32' },
-  panelAffordTxt:         { fontSize: 12, color: '#fff', fontWeight: '700' },
+  panelActionBtn:  { backgroundColor: '#f9a825', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
+  panelUpgradeBtn: { backgroundColor: '#1565c0' },
+  panelActionTxt:  { fontSize: 16 },
   panelCloseBtn:          { marginTop: 8, marginBottom: 8, backgroundColor: '#f9a825', paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
 });
