@@ -15,7 +15,8 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useGameContext } from '@/store/game-context';
-import { formatBananas } from '@/utils/format-bananas';
+import { formatBananas, formatRate } from '@/utils/format-bananas';
+import { ScrollView } from 'react-native';
 import { QUESTS } from '@/store/quests-config';
 import { UPGRADES } from '@/store/upgrades-config';
 import { AGES } from '@/store/ages-config';
@@ -35,6 +36,118 @@ import { useAgeTheme } from '@/hooks/use-age-theme';
 import { registerTutorialRef, fireTutorialEvent, isBananaLocked } from '@/utils/tutorial-refs';
 
 type Panel = 'upgrades' | 'quests';
+type BreakdownMode = 'bpc' | 'bps';
+
+// ─── Breakdown modal ──────────────────────────────────────────────────────────
+
+interface BreakdownLine {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  separator?: boolean;
+}
+
+function BreakdownModal({ mode, state, bps, bpc, comboMultiplier, weatherMultiplier, weatherEmoji, isBoosterActive, onClose }: {
+  mode: BreakdownMode;
+  state: ReturnType<typeof import('@/store/use-game').useGame>['state'];
+  bps: number; bpc: number;
+  comboMultiplier: number;
+  weatherMultiplier: number;
+  weatherEmoji: string;
+  isBoosterActive: boolean;
+  onClose: () => void;
+}) {
+  const lines: BreakdownLine[] = [];
+
+  if (mode === 'bpc') {
+    const zoneClick = ZONES
+      .filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.clickBonus)
+      .reduce((sum, z) => sum + (z.bonus.clickBonus ?? 0), 0);
+    const base = state.bananasPerClick + (state.heritageBpc ?? 0) + zoneClick;
+
+    lines.push({ label: '⚡ Base', value: `${formatRate(state.bananasPerClick)} / clic` });
+    if ((state.heritageBpc ?? 0) > 0)
+      lines.push({ label: '🧬 Héritage migrations', value: `+${state.heritageBpc} / clic` });
+    ZONES.filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.clickBonus).forEach(z => {
+      lines.push({ label: `🌍 ${z.id}`, value: `+${formatRate(z.bonus.clickBonus!)} / clic` });
+    });
+    lines.push({ label: 'Sous-total', value: `${formatRate(base)} / clic`, separator: true });
+    if (state.comboUnlocked && comboMultiplier > 1)
+      lines.push({ label: `🔥 Combo actuel`, value: `×${comboMultiplier}` });
+    lines.push({ label: '✅ Total effectif', value: `${formatRate(base * comboMultiplier)} / clic`, highlight: true });
+
+  } else {
+    const baseMult = ZONES
+      .filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.bpsMultiplier)
+      .reduce((m, z) => m + (z.bonus.bpsMultiplier ?? 0), 1);
+
+    let upgradeBase = 0;
+    UPGRADES.filter(u => (u.minAge ?? 0) === state.currentAge).forEach(u => {
+      const count = state.upgrades[u.id] ?? 0;
+      if (count === 0) return;
+      const contrib = u.baseBps * count;
+      upgradeBase += contrib;
+      lines.push({ label: `${u.name} ×${count}`, value: `${formatRate(contrib)} / sec` });
+    });
+
+    lines.push({ label: 'Sous-total upgrades', value: `${formatRate(upgradeBase)} / sec`, separator: true });
+
+    ZONES.filter(z => (state.zoneLevels[z.id] ?? 0) >= 1 && z.bonus.bpsMultiplier).forEach(z => {
+      lines.push({ label: `🌍 Zone ×${z.bonus.bpsMultiplier! * 100 | 0}% BPS`, value: `+${formatRate(upgradeBase * z.bonus.bpsMultiplier!)} / sec` });
+    });
+
+    if ((state.heritageBps ?? 0) > 0)
+      lines.push({ label: '🧬 Héritage BPS', value: `+${formatRate(state.heritageBps!)} / sec` });
+
+    const baseNet = upgradeBase * baseMult + (state.heritageBps ?? 0);
+    lines.push({ label: 'Production nette', value: `${formatRate(baseNet)} / sec`, separator: true });
+
+    if (weatherMultiplier !== 1)
+      lines.push({ label: `${weatherEmoji} Météo`, value: `×${weatherMultiplier.toFixed(2)}` });
+    if (isBoosterActive)
+      lines.push({ label: '🚀 Accélérateur', value: '×3' });
+
+    lines.push({ label: '✅ Total effectif', value: `${formatRate(bps)} / sec`, highlight: true });
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={bdStyles.overlay} onPress={onClose}>
+        <Pressable style={bdStyles.card} onPress={() => {}}>
+          <Text style={bdStyles.title}>
+            {mode === 'bpc' ? '🍌 Détail / clic' : '🍌 Détail / sec'}
+          </Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {lines.map((l, i) => (
+              <View key={i} style={[bdStyles.row, l.separator && bdStyles.rowSep, l.highlight && bdStyles.rowHL]}>
+                <Text style={[bdStyles.label, l.highlight && bdStyles.labelHL]}>{l.label}</Text>
+                <Text style={[bdStyles.value, l.highlight && bdStyles.valueHL]}>{l.value}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          <Pressable style={bdStyles.closeBtn} onPress={onClose}>
+            <Text style={bdStyles.closeTxt}>Fermer</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const bdStyles = StyleSheet.create({
+  overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  card:     { backgroundColor: '#12131f', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '75%' },
+  title:    { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 16, textAlign: 'center' },
+  row:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  rowSep:   { marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
+  rowHL:    { backgroundColor: 'rgba(249,168,37,0.1)', borderRadius: 10, paddingHorizontal: 8, marginTop: 8 },
+  label:    { fontSize: 13, color: 'rgba(255,255,255,0.65)', flex: 1 },
+  labelHL:  { color: '#ffd700', fontWeight: '700' },
+  value:    { fontSize: 13, fontWeight: '600', color: '#fff' },
+  valueHL:  { color: '#ffd700', fontWeight: '900', fontSize: 15 },
+  closeBtn: { backgroundColor: '#f9a825', borderRadius: 14, paddingVertical: 12, alignItems: 'center', marginTop: 16 },
+  closeTxt: { fontSize: 15, fontWeight: '800', color: '#0a0a0a' },
+});
 
 const AGE_BACKGROUNDS: Record<number, ImageSourcePropType> = {
   0: require('@/assets/images/backgrounds/bg_banana_clicker.png'),
@@ -360,7 +473,7 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
 }
 
 export default function BananaClicker() {
-  const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
+  const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, weatherMultiplier, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
   const theme  = useAgeTheme();
   const insets = useSafeAreaInsets();
 
@@ -389,6 +502,7 @@ export default function BananaClicker() {
   const [questNotif, setQuestNotif]             = useState<{ id: string; title: string; reward: number } | null>(null);
   const prevCompleted = useRef<string[]>([]);
   const [comboMultiplier, setComboMultiplier] = useState(1);
+  const [breakdown, setBreakdown] = useState<BreakdownMode | null>(null);
   const [autoClickEnabled, setAutoClickEnabled] = useState(true);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showMigrationAnim, setShowMigrationAnim]   = useState(false);
@@ -584,6 +698,19 @@ export default function BananaClicker() {
         />
       )}
 
+      {breakdown && (
+        <BreakdownModal
+          mode={breakdown}
+          state={state}
+          bps={bps} bpc={bpc}
+          comboMultiplier={comboMultiplier}
+          weatherMultiplier={weatherMultiplier}
+          weatherEmoji={weatherEmoji}
+          isBoosterActive={isBoosterActive}
+          onClose={() => setBreakdown(null)}
+        />
+      )}
+
       <ImageBackground
         source={AGE_BACKGROUNDS[state.currentAge] ?? require('@/assets/images/backgrounds/bg_banana_clicker.png')}
         style={styles.hero}
@@ -593,7 +720,11 @@ export default function BananaClicker() {
         <Pressable style={StyleSheet.absoluteFill} onPress={(e) => handleClick(e)} />
         <WeatherOverlay type={weatherType} height={HERO_HEIGHT} />
         <View ref={statsRef} style={[styles.statsWrapper, { paddingTop: insets.top + 8 }]} pointerEvents="none">
-          <StatsBar bananas={state.bananas} bps={bps} bpc={bpc} comboMultiplier={comboMultiplier} />
+          <StatsBar
+            bananas={state.bananas} bps={bps} bpc={bpc} comboMultiplier={comboMultiplier}
+            onPressBps={() => setBreakdown('bps')}
+            onPressBpc={() => setBreakdown('bpc')}
+          />
           {weatherLabel ? (
             <Text style={styles.weather}>{weatherEmoji} {weatherLabel}</Text>
           ) : null}

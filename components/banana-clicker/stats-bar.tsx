@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatBananas, formatRate } from '@/utils/format-bananas';
 
 interface StatsBarProps {
@@ -7,17 +7,25 @@ interface StatsBarProps {
   bps: number;
   bpc: number;
   comboMultiplier?: number;
+  onPressBps?: () => void;
+  onPressBpc?: () => void;
 }
 
-export function StatsBar({ bananas, bps, bpc, comboMultiplier = 1 }: StatsBarProps) {
+export function StatsBar({ bananas, bps, bpc, comboMultiplier = 1, onPressBps, onPressBpc }: StatsBarProps) {
   const effectiveBpc = bpc * comboMultiplier;
   return (
     <View style={styles.pill}>
       <Text style={styles.count}>{formatBananas(bananas)} 🍌</Text>
       <View style={styles.row}>
-        {bps > 0 && <Text style={styles.bps}>{formatRate(bps)} / sec</Text>}
+        {bps > 0 && (
+          <Pressable onPress={onPressBps} hitSlop={8}>
+            <Text style={styles.bps}>{formatRate(bps)} / sec ⓘ</Text>
+          </Pressable>
+        )}
         {bps > 0 && <Text style={styles.sep}>·</Text>}
-        <Text style={styles.bpc}>{formatRate(effectiveBpc)} / clic</Text>
+        <Pressable onPress={onPressBpc} hitSlop={8}>
+          <Text style={styles.bpc}>{formatRate(effectiveBpc)} / clic ⓘ</Text>
+        </Pressable>
       </View>
     </View>
   );
