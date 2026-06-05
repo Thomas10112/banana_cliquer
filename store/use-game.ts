@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { getBps, gameReducer, INITIAL_STATE } from './game-reducer';
 import { ACHIEVEMENTS } from './achievements-config';
 import { getZoneMaxStock } from './zones-config';
@@ -60,6 +61,17 @@ export function useGame(weatherMultiplier: number = 1) {
     }, SAVE_DEBOUNCE_MS);
     return () => clearTimeout(saveTimeout.current);
   }, [state]);
+
+  // ── Sauvegarde immédiate quand l'app passe en arrière-plan ──
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if ((nextState === 'background' || nextState === 'inactive') && loadedRef.current) {
+        clearTimeout(saveTimeout.current);
+        AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...stateRef.current, lastSavedAt: Date.now() }));
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // ── Tick ──
   useEffect(() => {
