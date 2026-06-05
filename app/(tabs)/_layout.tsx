@@ -181,17 +181,17 @@ function TabsWithModal() {
           tabBarButton: HapticTab,
         }}>
         <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Carte',
-            tabBarIcon: () => <Text style={{ fontSize: 22 }}>🗺️</Text>,
-          }}
-        />
-        <Tabs.Screen
           name="BananaClicker"
           options={{
             title: 'Banana',
             tabBarIcon: () => <Text style={{ fontSize: 22 }}>🍌</Text>,
+          }}
+        />
+        <Tabs.Screen
+          name="map"
+          options={{
+            title: 'Carte',
+            tabBarIcon: () => <Text style={{ fontSize: 22 }}>🗺️</Text>,
           }}
         />
         <Tabs.Screen
