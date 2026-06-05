@@ -1,11 +1,13 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useEffect, useRef } from 'react';
+import { getSettings } from '@/hooks/use-settings';
 
 const VOLUME     = 0.25;
 const FADE_STEPS = 25;
 const FADE_MS    = 1500;
 
 export function useAmbiance(currentAge: number, enabled = true) {
+  const musicAllowed = enabled && getSettings().musicEnabled;
   const p0 = useAudioPlayer(require('@/assets/sounds/ambiances/ere_sauvage_ambiance.mp3'));
   const p1 = useAudioPlayer(require('@/assets/sounds/ambiances/ere_agricole_ambiance.mp3'));
   const p2 = useAudioPlayer(require('@/assets/sounds/ambiances/ere_industrielle_ambiance.mp3'));
@@ -27,7 +29,7 @@ export function useAmbiance(currentAge: number, enabled = true) {
   useEffect(() => {
     clearInterval(timerRef.current);
 
-    if (!enabled) {
+    if (!musicAllowed) {
       // Fade out le player actif s'il y en a un
       const cur = playingRef.current >= 0 ? players[playingRef.current] : null;
       if (!cur) return;
@@ -66,5 +68,5 @@ export function useAmbiance(currentAge: number, enabled = true) {
       if (step >= FADE_STEPS) clearInterval(timerRef.current);
     }, FADE_MS / FADE_STEPS);
 
-  }, [currentAge, enabled]);
+  }, [currentAge, musicAllowed]);
 }

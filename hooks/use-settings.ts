@@ -1,0 +1,45 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
+
+const KEY = 'banana_clicker_settings_v1';
+
+export interface Settings {
+  musicEnabled: boolean;
+  soundEnabled: boolean;
+}
+
+const DEFAULT: Settings = { musicEnabled: true, soundEnabled: true };
+let _current: Settings = { ...DEFAULT };
+let _listeners: Array<(s: Settings) => void> = [];
+let _loaded = false;
+
+function broadcast() { _listeners.forEach(fn => fn({ ..._current })); }
+
+export function getSettings(): Settings { return _current; }
+
+async function initLoad() {
+  if (_loaded) return;
+  _loaded = true;
+  try {
+    const raw = await AsyncStorage.getItem(KEY);
+    if (raw) { _current = { ...DEFAULT, ...JSON.parse(raw) }; broadcast(); }
+  } catch {}
+}
+
+export function useSettings() {
+  const [settings, setSettings] = useState<Settings>({ ..._current });
+
+  useEffect(() => {
+    initLoad();
+    _listeners.push(setSettings);
+    return () => { _listeners = _listeners.filter(fn => fn !== setSettings); };
+  }, []);
+
+  async function set(key: keyof Settings, value: boolean) {
+    _current = { ..._current, [key]: value };
+    broadcast();
+    await AsyncStorage.setItem(KEY, JSON.stringify(_current));
+  }
+
+  return { settings, set };
+}
