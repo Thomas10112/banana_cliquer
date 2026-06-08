@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "release": "node ./scripts/release.mjs"
+    "release": "node ./scripts/release.mjs",
+    "release:dry": "node ./scripts/release.mjs --dry-run"
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
