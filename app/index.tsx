@@ -17,6 +17,7 @@ import { useProfile } from '@/hooks/use-profile';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useWhatsNew } from '@/hooks/use-whats-new';
 import { WhatsNewModal } from '@/components/whats-new-modal';
+import { UpdatePrompt } from '@/components/update-prompt';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const VERSION  = Constants.expoConfig?.version ?? '1.0.0';
@@ -301,6 +302,9 @@ export default function HomeScreen() {
       {whatsNew.show && (
         <WhatsNewModal entry={whatsNew.entry} onClose={whatsNew.markSeen} />
       )}
+
+      {/* Bandeau « Installer la mise à jour » (en bas de l'accueil) */}
+      <UpdatePrompt />
     </ImageBackground>
   );
 }
