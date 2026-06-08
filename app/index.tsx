@@ -14,6 +14,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/hooks/use-settings';
 import { useProfile } from '@/hooks/use-profile';
+import { useOnboarding } from '@/hooks/use-onboarding';
+import { useWhatsNew } from '@/hooks/use-whats-new';
+import { WhatsNewModal } from '@/components/whats-new-modal';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const VERSION  = Constants.expoConfig?.version ?? '1.0.0';
@@ -219,6 +222,11 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // « Quoi de neuf ? » — sur l'accueil, une fois par nouvelle version, sauf
+  // pour un tout nouveau joueur (onboarding pas encore fait).
+  const { hasSeenIntro } = useOnboarding();
+  const whatsNew = useWhatsNew(hasSeenIntro === true && !menuOpen);
+
   const logoScale  = useSharedValue(0);
   const titleOp    = useSharedValue(0);
   const titleTy    = useSharedValue(24);
@@ -288,6 +296,11 @@ export default function HomeScreen() {
 
       {/* Panneau menu */}
       {menuOpen && <MenuPanel visible={menuOpen} onClose={() => setMenuOpen(false)} />}
+
+      {/* Quoi de neuf ? (après une mise à jour) */}
+      {whatsNew.show && (
+        <WhatsNewModal entry={whatsNew.entry} onClose={whatsNew.markSeen} />
+      )}
     </ImageBackground>
   );
 }

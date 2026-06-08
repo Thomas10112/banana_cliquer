@@ -2,7 +2,7 @@
   "expo": {
     "name": "Banana Punch",
     "slug": "projet_react_native",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo_banana_punch.png",
     "scheme": "bananapunch",
@@ -66,9 +66,7 @@
       "fallbackToCacheTimeout": 3000,
       "checkAutomatically": "ON_LOAD"
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false

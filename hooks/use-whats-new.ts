@@ -17,7 +17,7 @@ export function useWhatsNew(enabled: boolean) {
 
   const markSeen = useCallback(() => {
     setShow(false);
-    AsyncStorage.setItem(KEY, LATEST_CHANGELOG.id);
+    AsyncStorage.setItem(KEY, LATEST_CHANGELOG.version);
   }, []);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function useWhatsNew(enabled: boolean) {
     let cancelled = false;
     AsyncStorage.getItem(KEY).then(seen => {
       if (cancelled) return;
-      if (seen !== LATEST_CHANGELOG.id) setShow(true);
+      if (seen !== LATEST_CHANGELOG.version) setShow(true);
     });
     return () => { cancelled = true; };
   }, [enabled]);

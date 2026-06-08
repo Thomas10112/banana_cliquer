@@ -9,7 +9,10 @@ export function WhatsNewModal({ entry, onClose }: { entry: ChangelogEntry; onClo
         <View style={styles.card}>
           <Text style={styles.emoji}>🎉</Text>
           <Text style={styles.title}>{entry.title ?? 'Quoi de neuf ?'}</Text>
-          <Text style={styles.date}>Mise à jour du {entry.date}</Text>
+          <View style={styles.versionPill}>
+            <Text style={styles.versionTxt}>v{entry.version}</Text>
+          </View>
+          <Text style={styles.date}>{entry.date}</Text>
 
           <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
             {entry.items.map((item, i) => (
@@ -51,7 +54,13 @@ const styles = StyleSheet.create({
   },
   emoji: { fontSize: 48 },
   title: { fontSize: 21, fontWeight: '800', color: '#fff', textAlign: 'center' },
-  date:  { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 8 },
+  versionPill: {
+    backgroundColor: 'rgba(249,168,37,0.18)',
+    borderWidth: 1, borderColor: 'rgba(249,168,37,0.5)',
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 3, marginTop: 4,
+  },
+  versionTxt: { fontSize: 13, fontWeight: '800', color: '#ffd700', letterSpacing: 0.5 },
+  date:  { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4, marginBottom: 8 },
   list:  { alignSelf: 'stretch', marginBottom: 8 },
   listContent: { gap: 12, paddingVertical: 4 },
   row:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 4 },
