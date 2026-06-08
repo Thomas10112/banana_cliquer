@@ -15,6 +15,8 @@ import { GameProvider } from '@/store/game-context';
 import { useGameContext, useGameActions } from '@/store/game-context';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { TutorialOverlay } from '@/components/onboarding/TutorialOverlay';
+import { WhatsNewModal } from '@/components/whats-new-modal';
+import { useWhatsNew } from '@/hooks/use-whats-new';
 import { formatBananas } from '@/utils/format-bananas';
 
 function formatDuration(seconds: number): string {
@@ -246,12 +248,18 @@ const upStyles = StyleSheet.create({
 
 function TabsWithModal() {
   const theme = useAgeTheme();
-  const { state, zoneFullQueue, dismissZoneFull } = useGameContext();
+  const { state, zoneFullQueue, dismissZoneFull, pendingOfflineGains } = useGameContext();
   const { hasSeenIntro, completeOnboarding } = useOnboarding();
   const tutorial = useTutorial();
   const [replayIntro, setReplayIntro] = useState(false);
   const showingOnboarding = hasSeenIntro === false || replayIntro;
   useAmbiance(state.currentAge, !showingOnboarding);
+
+  // « Quoi de neuf ? » : seulement une fois l'accueil prêt (pas en onboarding,
+  // pas pendant le tuto, pas par-dessus la pop-up de gains hors-ligne).
+  const whatsNew = useWhatsNew(
+    hasSeenIntro === true && !showingOnboarding && !tutorial.isActive && pendingOfflineGains === 0,
+  );
 
   // Bloquer la banane pendant tout le didacticiel sauf step 0
   useEffect(() => {
@@ -300,9 +308,13 @@ function TabsWithModal() {
       </Tabs>
       <OfflineGainsModal />
       <ResetSuccessModal onReplayTutorial={() => setReplayIntro(true)} />
+      {whatsNew.show && (
+        <WhatsNewModal entry={whatsNew.entry} onClose={whatsNew.markSeen} />
+      )}
       {(hasSeenIntro === false || replayIntro) && (
         <OnboardingFlow onComplete={() => {
           completeOnboarding();
+          whatsNew.markSeen();
           setReplayIntro(false);
           tutorial.start();
         }} />

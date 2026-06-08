@@ -448,7 +448,7 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
 
         <Pressable
           style={[styles.whaleBtn, !canBuyWhale && styles.whaleBtnDisabled]}
-          onPress={() => { if (canBuyWhale) { onBuyWhale(); onClose(); } }}
+          onPress={() => { if (canBuyWhale) onBuyWhale(); }}
         >
           <Text style={styles.whaleBtnEmoji}>{transport.emoji}</Text>
           <View>
@@ -563,8 +563,6 @@ export default function WorldMapScreen() {
   const [followedWhaleIdx, setFollowedWhaleIdx] = useState<number | null>(null);
   const [indicators, setIndicators]            = useState<IndicatorData[]>([]);
   const [mapLoaded, setMapLoaded]              = useState(false);
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
 
   const age       = AGES[state.currentAge];
   const mapSrc    = AGE_MAPS[state.currentAge];
@@ -624,41 +622,38 @@ export default function WorldMapScreen() {
     ty.value    = withTiming(Math.max(-maxY, Math.min(maxY, rawTy)), cfg);
   }
 
-  function scrollToMapCoord(xPct: number, yPct: number) {
+  function scrollToMapCoord(xPct: number, yPct: number, duration = 1000) {
     const s    = scale.value;
     const rawTx = MAP_W * (0.5 - xPct) * s;
     const rawTy = MAP_H * (0.5 - yPct) * s;
     const maxX  = Math.max(0, (MAP_W * s - SW) / 2);
     const maxY  = Math.max(0, (MAP_H * s - SH) / 2);
-    tx.value    = Math.max(-maxX, Math.min(maxX, rawTx));
-    ty.value    = Math.max(-maxY, Math.min(maxY, rawTy));
-    savedTx.value = tx.value;
-    savedTy.value = ty.value;
+    const tgX   = Math.max(-maxX, Math.min(maxX, rawTx));
+    const tgY   = Math.max(-maxY, Math.min(maxY, rawTy));
+    // Glisse en linéaire sur la même durée que le marqueur (1 tick) → la caméra
+    // et le transport bougent à l'identique, sans saccade.
+    tx.value      = withTiming(tgX, { duration, easing: Easing.linear });
+    ty.value      = withTiming(tgY, { duration, easing: Easing.linear });
+    savedTx.value = tgX;
+    savedTy.value = tgY;
   }
 
-  const followedIdxRef = useRef(followedWhaleIdx);
-  useEffect(() => { followedIdxRef.current = followedWhaleIdx; }, [followedWhaleIdx]);
-
-  // Suivi en temps réel du transport sélectionné
+  // Suivi du transport : recadre à chaque tick (changement de playTimeSeconds),
+  // exactement en phase avec l'animation du marqueur → suivi fluide et centré.
   useEffect(() => {
     if (followedWhaleIdx === null) return;
-    const id = setInterval(() => {
-      const idx = followedIdxRef.current;
-      if (idx === null) return;
-      const s = stateRef.current;
-      const trip = s.activeWhales.find(w => getWhaleIdx(w.id) === idx);
-      if (!trip) return;
-      const fromPOI = pois.find(p => p.id === trip.fromZoneId);
-      const toPOI   = pois.find(p => p.id === trip.toZoneId);
-      if (!fromPOI || !toPOI) return;
-      const fraction = Math.max(0, Math.min(1, (s.playTimeSeconds - trip.startedAt) / trip.duration));
-      scrollToMapCoord(
-        fromPOI.xPct + (toPOI.xPct - fromPOI.xPct) * fraction,
-        fromPOI.yPct + (toPOI.yPct - fromPOI.yPct) * fraction,
-      );
-    }, 250);
-    return () => clearInterval(id);
-  }, [followedWhaleIdx, pois]);
+    const trip = state.activeWhales.find(w => getWhaleIdx(w.id) === followedWhaleIdx);
+    if (!trip) return;
+    const fromPOI = pois.find(p => p.id === trip.fromZoneId);
+    const toPOI   = pois.find(p => p.id === trip.toZoneId);
+    if (!fromPOI || !toPOI) return;
+    const fraction = Math.max(0, Math.min(1, (state.playTimeSeconds - trip.startedAt) / trip.duration));
+    scrollToMapCoord(
+      fromPOI.xPct + (toPOI.xPct - fromPOI.xPct) * fraction,
+      fromPOI.yPct + (toPOI.yPct - fromPOI.yPct) * fraction,
+      1000,
+    );
+  }, [followedWhaleIdx, pois, state.playTimeSeconds, state.activeWhales]);
 
   const pinch = Gesture.Pinch()
     .onBegin(() => { savedScale.value = scale.value; })
