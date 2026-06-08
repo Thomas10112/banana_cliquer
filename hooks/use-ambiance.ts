@@ -1,6 +1,7 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useEffect, useRef } from 'react';
 import { getSettings } from '@/hooks/use-settings';
+import { setActiveMusic } from '@/utils/music-bus';
 
 const VOLUME     = 0.25;
 const FADE_STEPS = 25;
@@ -23,6 +24,7 @@ export function useAmbiance(currentAge: number, enabled = true) {
     return () => {
       clearInterval(timerRef.current);
       players.forEach(p => { try { p.pause(); } catch {} });
+      setActiveMusic(null, VOLUME);
     };
   }, []);
 
@@ -30,6 +32,7 @@ export function useAmbiance(currentAge: number, enabled = true) {
     clearInterval(timerRef.current);
 
     if (!musicAllowed) {
+      setActiveMusic(null, VOLUME); // pas de musique → pas de ducking
       // Fade out le player actif s'il y en a un
       const cur = playingRef.current >= 0 ? players[playingRef.current] : null;
       if (!cur) return;
@@ -55,6 +58,7 @@ export function useAmbiance(currentAge: number, enabled = true) {
     newP.volume = 0;
     newP.play();
     playingRef.current = currentAge;
+    setActiveMusic(newP, VOLUME); // cible du ducking
 
     let step = 0;
     timerRef.current = setInterval(() => {

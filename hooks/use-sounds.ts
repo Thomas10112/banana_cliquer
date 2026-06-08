@@ -1,5 +1,6 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useCallback } from 'react';
+import { duckMusic } from '@/utils/music-bus';
 
 export function useSounds() {
   // Âge 0
@@ -22,6 +23,8 @@ export function useSounds() {
   const ordinateurPlayer   = useAudioPlayer(require('@/assets/sounds/age-3/ordinateur.mp3'));
   const dronePlayer        = useAudioPlayer(require('@/assets/sounds/age-3/drone.aac'));
   const satellitePlayer    = useAudioPlayer(require('@/assets/sounds/age-3/satellite.mp3'));
+  // Âge 4
+  const iaPlayer           = useAudioPlayer(require('@/assets/sounds/age-4/ia.mp3'));
   // UI
   const questPlayer     = useAudioPlayer(require('@/assets/sounds/ui/mixkit-achievement-bell-600.wav'));
   const migrationPlayer = useAudioPlayer(require('@/assets/sounds/ambiances/migrations.mp3'));
@@ -43,12 +46,15 @@ export function useSounds() {
       upgradeId === 'ordinateur'       ? ordinateurPlayer :
       upgradeId === 'drone'            ? dronePlayer      :
       upgradeId === 'satellite'        ? satellitePlayer  :
+      upgradeId === 'ia'               ? iaPlayer         :
                                          monkeyPlayer;
+    player.volume = 1;   // SFX d'upgrade au volume plein (sans dépasser)
+    duckMusic();         // baisse brièvement la musique d'ambiance
     player.seekTo(0);
     player.play();
   }, [monkeyPlayer, guerrierPlayer, bananierPlayer, girafePlayer,
       paysanPlayer, charruePlayer, moulinPlayer, marchePlayer,
-      ouvrierPlayer, machinePlayer, usinePlayer, locomotivePlayer, ingenieurPlayer, ordinateurPlayer, dronePlayer, satellitePlayer]);
+      ouvrierPlayer, machinePlayer, usinePlayer, locomotivePlayer, ingenieurPlayer, ordinateurPlayer, dronePlayer, satellitePlayer, iaPlayer]);
 
   const playQuest = useCallback(() => {
     questPlayer.seekTo(0);
