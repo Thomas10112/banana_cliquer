@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { ImageSourcePropType, useWindowDimensions } from 'react-native';
 import { Dimensions, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -476,6 +477,7 @@ export default function BananaClicker() {
   const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, weatherMultiplier, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
   const theme  = useAgeTheme();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
 
   const bananaRef       = useRef<View>(null);
   const bananaButtonRef = useRef<BananaButtonHandle>(null);
@@ -730,10 +732,11 @@ export default function BananaClicker() {
       >
         {/* Zone de clic étendue à tout le héro */}
         <Pressable style={StyleSheet.absoluteFill} onPress={(e) => handleClick(e)} />
-        <WeatherOverlay type={weatherType} height={HERO_HEIGHT} />
+        <WeatherOverlay type={weatherType} height={HERO_HEIGHT} active={isFocused} />
         <View ref={statsRef} style={[styles.statsWrapper, { paddingTop: insets.top + 8 }]} pointerEvents="none">
           <StatsBar
             bananas={state.bananas} bps={bps} bpc={bpc} comboMultiplier={comboMultiplier}
+            active={isFocused}
             onPressBps={() => setBreakdown('bps')}
             onPressBpc={() => setBreakdown('bpc')}
           />

@@ -173,14 +173,14 @@ function SunGlow({ containerWidth }: { containerWidth: number }) {
 
 // ─── Main overlay ─────────────────────────────────────────────────────────────
 
-interface Props { type: WeatherType; height: number }
+interface Props { type: WeatherType; height: number; active?: boolean }
 
-export function WeatherOverlay({ type, height }: Props) {
+export function WeatherOverlay({ type, height, active = true }: Props) {
   const { width } = useWindowDimensions();
 
   const drops = useMemo(() => {
     if (type !== 'rain' && type !== 'storm' && type !== 'drizzle') return [];
-    const count    = type === 'drizzle' ? 15 : type === 'storm' ? 38 : 26;
+    const count    = type === 'drizzle' ? 8 : type === 'storm' ? 18 : 13;
     const isStorm  = type === 'storm';
     const isDrizzle = type === 'drizzle';
     return Array.from({ length: count }, (_, i) => ({
@@ -195,8 +195,18 @@ export function WeatherOverlay({ type, height }: Props) {
 
   const flakes = useMemo(() => {
     if (type !== 'snow') return [];
-    return Array.from({ length: 22 }, (_, i) => ({ id: i, delay: Math.random() * 4500 }));
+    return Array.from({ length: 12 }, (_, i) => ({ id: i, delay: Math.random() * 4500 }));
   }, [type]);
+
+  // Écran non visible (autre onglet) : on garde juste la teinte, on coupe toutes
+  // les animations en boucle pour libérer le thread UI / GPU.
+  if (!active) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: TINT[type] }]} />
+      </View>
+    );
+  }
 
   return (
     <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">

@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useGameContext } from '@/store/game-context';
 import { AGES } from '@/store/ages-config';
 import { registerTutorialRef } from '@/utils/tutorial-refs';
@@ -248,26 +249,30 @@ function BoatsModal({
 
 // ─── Whale animated marker ────────────────────────────────────────────────────
 
-function WhaleMarker({ trip, pois, playTime, transportEmoji }: { trip: WhaleTrip; pois: POI[]; playTime: number; transportEmoji: string }) {
+const WhaleMarker = React.memo(function WhaleMarker({ trip, pois, playTime, transportEmoji }: { trip: WhaleTrip; pois: POI[]; playTime: number; transportEmoji: string }) {
   const fromPOI = pois.find(p => p.id === trip.fromZoneId);
   const toPOI   = pois.find(p => p.id === trip.toZoneId);
-  if (!fromPOI || !toPOI) return null;
 
-  const fraction = Math.max(0, Math.min(1, (playTime - trip.startedAt) / trip.duration));
-  const targetX  = (fromPOI.xPct + (toPOI.xPct - fromPOI.xPct) * fraction) * MAP_W;
-  const targetY  = (fromPOI.yPct + (toPOI.yPct - fromPOI.yPct) * fraction) * MAP_H;
+  const fraction = fromPOI && toPOI ? Math.max(0, Math.min(1, (playTime - trip.startedAt) / trip.duration)) : 0;
+  const targetX  = fromPOI && toPOI ? (fromPOI.xPct + (toPOI.xPct - fromPOI.xPct) * fraction) * MAP_W : 0;
+  const targetY  = fromPOI && toPOI ? (fromPOI.yPct + (toPOI.yPct - fromPOI.yPct) * fraction) * MAP_H : 0;
 
   const x = useSharedValue(targetX);
   const y = useSharedValue(targetY);
 
   useEffect(() => {
-    x.value = withTiming(targetX, { duration: 120 });
-    y.value = withTiming(targetY, { duration: 120 });
+    if (!fromPOI || !toPOI) return;
+    // Glisse linéairement sur ~1 s (durée d'un tick) → trajectoire continue
+    // malgré la mise à jour de position une seule fois par seconde.
+    x.value = withTiming(targetX, { duration: 1000, easing: Easing.linear });
+    y.value = withTiming(targetY, { duration: 1000, easing: Easing.linear });
   }, [targetX, targetY]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value - 14 }, { translateY: y.value - 14 }],
   }));
+
+  if (!fromPOI || !toPOI) return null;
 
   const goingRight = toPOI.xPct >= fromPOI.xPct;
 
@@ -276,11 +281,11 @@ function WhaleMarker({ trip, pois, playTime, transportEmoji }: { trip: WhaleTrip
       <Text style={{ fontSize: 22, transform: [{ scaleX: goingRight ? 1 : -1 }] }}>{transportEmoji}</Text>
     </Animated.View>
   );
-}
+});
 
 // ─── POI Marker ───────────────────────────────────────────────────────────────
 
-function POIMarker({
+const POIMarker = React.memo(function POIMarker({
   poi, level, stock, maxStock, onPress,
 }: { poi: POI; level: number; stock: number; maxStock: number; onPress: (p: POI) => void }) {
   const conquered = level >= 1;
@@ -307,7 +312,7 @@ function POIMarker({
       </View>
     </Pressable>
   );
-}
+});
 
 // ─── Off-screen bubble ────────────────────────────────────────────────────────
 
@@ -543,6 +548,7 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
 
 export default function WorldMapScreen() {
   const { state, conquerZone, upgradeZone, harvestZone, buyWhale } = useGameContext();
+  const isFocused = useIsFocused();
   const mapAreaRef    = useRef<View>(null);
   const mapPanelBtnRef = useRef<any>(null);
   const firstPoiRef   = useRef<View>(null);
@@ -564,6 +570,13 @@ export default function WorldMapScreen() {
   const mapSrc    = AGE_MAPS[state.currentAge];
   const pois      = AGE_POIS[state.currentAge] ?? [];
   const transport = AGE_TRANSPORT[state.currentAge] ?? AGE_TRANSPORT[0];
+
+  // Quand la carte n'est pas l'écran actif, on gèle l'heure de jeu transmise
+  // aux baleines : leurs props deviennent stables → React.memo coupe les
+  // re-renders et l'animation Reanimated ne tourne pas pour rien hors-écran.
+  const whalePlayRef = useRef(state.playTimeSeconds);
+  if (isFocused) whalePlayRef.current = state.playTimeSeconds;
+  const whalePlayTime = isFocused ? state.playTimeSeconds : whalePlayRef.current;
 
   useEffect(() => {
     setMapLoaded(false);
@@ -715,7 +728,7 @@ export default function WorldMapScreen() {
                 key={trip.id}
                 trip={trip}
                 pois={pois}
-                playTime={state.playTimeSeconds}
+                playTime={whalePlayTime}
                 transportEmoji={transport.emoji}
               />
             ))}

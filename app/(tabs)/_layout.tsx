@@ -12,7 +12,7 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { useTutorial } from '@/hooks/use-tutorial';
 import { setBananaLocked } from '@/utils/tutorial-refs';
 import { GameProvider } from '@/store/game-context';
-import { useGameContext } from '@/store/game-context';
+import { useGameContext, useGameActions } from '@/store/game-context';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { TutorialOverlay } from '@/components/onboarding/TutorialOverlay';
 import { formatBananas } from '@/utils/format-bananas';
@@ -158,7 +158,7 @@ const toastStyles = StyleSheet.create({
 
 function UpdateBanner() {
   const { isUpdateAvailable, isUpdatePending, availableUpdate } = Updates.useUpdates();
-  const { saveNow } = useGameContext();
+  const { saveNow } = useGameActions();
   const [dismissed, setDismissed] = useState(false);
   const [installing, setInstalling] = useState(false);
   const insets = useSafeAreaInsets();

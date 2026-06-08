@@ -6,7 +6,10 @@ import { ACHIEVEMENTS } from './achievements-config';
 import { getZoneMaxStock } from './zones-config';
 
 const SAVE_KEY = 'banana_clicker_v1';
-const TICK_MS  = 250;
+// Tick à 1 s : le compteur est lissé visuellement par AnimatedBananaCount
+// (interpolation Reanimated sur le thread UI), donc 4× moins de re-renders JS
+// sans perte de fluidité perçue.
+const TICK_MS  = 1000;
 const SAVE_INTERVAL_MS = 5000;
 const OFFLINE_MIN_SECONDS = 60;
 const OFFLINE_CAP_SECONDS = 4 * 3600;

@@ -1,21 +1,23 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatBananas, formatRate } from '@/utils/format-bananas';
+import { formatRate } from '@/utils/format-bananas';
+import { AnimatedBananaCount } from './animated-banana-count';
 
 interface StatsBarProps {
   bananas: number;
   bps: number;
   bpc: number;
   comboMultiplier?: number;
+  active?: boolean;
   onPressBps?: () => void;
   onPressBpc?: () => void;
 }
 
-export function StatsBar({ bananas, bps, bpc, comboMultiplier = 1, onPressBps, onPressBpc }: StatsBarProps) {
+export function StatsBar({ bananas, bps, bpc, comboMultiplier = 1, active = true, onPressBps, onPressBpc }: StatsBarProps) {
   const effectiveBpc = bpc * comboMultiplier;
   return (
     <View style={styles.pill}>
-      <Text style={styles.count}>{formatBananas(bananas)} 🍌</Text>
+      <AnimatedBananaCount bananas={bananas} bps={bps} active={active} style={styles.count} />
       <View style={styles.row}>
         {bps > 0 && (
           <Pressable onPress={onPressBps} hitSlop={8}>
