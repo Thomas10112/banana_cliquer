@@ -26,9 +26,9 @@ function bumpPatch(v) {
   return m ? `${m[1]}.${m[2]}.${Number(m[3]) + 1}` : v;
 }
 
-function run(cmd) {
+function run(cmd, env) {
   console.log(`\n$ ${cmd}`);
-  execSync(cmd, { stdio: 'inherit', cwd: ROOT });
+  execSync(cmd, { stdio: 'inherit', cwd: ROOT, env: { ...process.env, ...env } });
 }
 
 // Arguments optionnels (mode non-interactif / automatisable) :
@@ -107,7 +107,7 @@ try {
     console.log('  • constants/changelog.ts  : entrée ci-dessus insérée en premier');
     console.log('  • npx tsc --noEmit');
     console.log(`  • git commit -m "${msg}"`);
-    console.log(`  • npx eas update --branch preview --message "${msg}" --non-interactive`);
+    console.log(`  • CI=1 npx eas update --branch preview --message "${msg}"`);
     process.exit(0);
   }
 
@@ -141,8 +141,8 @@ try {
   run('git add -A');
   run(`git commit -m "${msg}"`);
 
-  // 5. OTA preview
-  run(`npx eas update --branch preview --message "${msg}" --non-interactive`);
+  // 5. OTA preview (CI=1 → eas non-interactif, cf. expo-cli)
+  run(`npx eas update --branch preview --message "${msg}"`, { CI: '1' });
 
   console.log(`\n✅ v${version} publiée sur le canal preview !`);
 } catch (e) {
