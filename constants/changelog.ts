@@ -16,6 +16,18 @@ export interface ChangelogEntry {
 // ⬇️ La plus récente EN PREMIER.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.2.0",
+    date: "9 juin 2026",
+    title: "La Taverne",
+    items: [
+      "🍺 Nouvelle Taverne : recrute des héros au gacha (débloquée à l'Ère Moderne)",
+      "🎖️ Assigne jusqu'à 3 héros à ton convoi — chacun apporte son bonus (BPS, cargaison, vitesse, stock, hors-ligne...)",
+      "⬆️ Fais monter tes héros en niveau avec tes bananes",
+      "⚔️ Raids de convoi : tes héros défendent ta cargaison (ou raflent gros !) lors des embuscades",
+      "🔊 Nouveaux sons pour le Robot et la Mégastructure (Ère Robotique)",
+    ],
+  },
+  {
     version: '0.1.0',
     date: '8 juin 2026',
     title: 'Première Alpha 🎉',

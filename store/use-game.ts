@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { getBpc, getBps, gameReducer, INITIAL_STATE } from './game-reducer';
 import { ACHIEVEMENTS } from './achievements-config';
 import { getZoneMaxStock } from './zones-config';
+import { heroOfflineMult, heroStockMult } from './hero-effects';
 
 const SAVE_KEY = 'banana_clicker_v1';
 // Tick à 1 s : le compteur est lissé visuellement par AnimatedBananaCount
@@ -40,8 +41,9 @@ export function useGame(weatherMultiplier: number = 1) {
             const elapsed = (Date.now() - saved.lastSavedAt) / 1000;
             const capped  = Math.min(elapsed, OFFLINE_CAP_SECONDS);
             if (capped >= OFFLINE_MIN_SECONDS) {
-              const bps    = getBps({ ...INITIAL_STATE, ...saved });
-              const gains  = Math.floor(bps * capped);
+              const merged = { ...INITIAL_STATE, ...saved };
+              const bps    = getBps(merged);
+              const gains  = Math.floor(bps * capped * heroOfflineMult(merged));
               if (gains > 0) {
                 dispatch({ type: 'ADD_OFFLINE_GAINS', amount: gains });
                 setPendingOfflineGains(gains);
@@ -91,7 +93,7 @@ export function useGame(weatherMultiplier: number = 1) {
     Object.entries(state.zoneStocks).forEach(([id, stock]) => {
       const level = state.zoneLevels[id] ?? 0;
       if (level < 1) return;
-      const max = getZoneMaxStock(level);
+      const max = getZoneMaxStock(level) * heroStockMult(state);
       if (max > 0 && stock >= max && (prev[id] ?? 0) < max) newFull.push(id);
     });
     if (newFull.length > 0) setZoneFullQueue(q => [...q, ...newFull]);
@@ -112,14 +114,22 @@ export function useGame(weatherMultiplier: number = 1) {
     return () => clearInterval(achievementTimer.current);
   }, []);
 
-  const boosterActive = state.playTimeSeconds < state.boosterLastUsed + 120;
+  const boosterActive = state.boosterActive;
   const bps = getBps(state) * weatherRef.current * (boosterActive ? 3 : 1);
   const bpc = getBpc(state);
 
   const click         = useCallback((comboMultiplier?: number) => dispatch({ type: 'CLICK', comboMultiplier }), []);
   const buyUpgrade     = useCallback((id: string) => dispatch({ type: 'BUY_UPGRADE', id }), []);
   const bulkBuyUpgrade = useCallback((id: string, quantity: number) => dispatch({ type: 'BUY_UPGRADE_BULK', id, quantity }), []);
-  const claimQuest    = useCallback((id: string) => dispatch({ type: 'CLAIM_QUEST', id }), []);
+  const claimQuest     = useCallback((id: string) => dispatch({ type: 'CLAIM_QUEST', id }), []);
+  const claimSideQuest = useCallback((id: string) => dispatch({ type: 'CLAIM_SIDE_QUEST', id }), []);
+  const upgradeTransport = useCallback(() => dispatch({ type: 'UPGRADE_TRANSPORT' }), []);
+  const pullGacha     = useCallback((count: number) => dispatch({ type: 'PULL_GACHA', count }), []);
+  const clearPull     = useCallback(() => dispatch({ type: 'CLEAR_PULL' }), []);
+  const devAddTokens  = useCallback((amount: number) => dispatch({ type: 'ADD_TOKENS', amount }), []);
+  const levelUpHero   = useCallback((id: string) => dispatch({ type: 'LEVEL_UP_HERO', id }), []);
+  const assignHero    = useCallback((heroId: string, slot: number) => dispatch({ type: 'ASSIGN_HERO', heroId, slot }), []);
+  const unassignHero  = useCallback((slot: number) => dispatch({ type: 'UNASSIGN_HERO', slot }), []);
   const migrate       = useCallback(() => dispatch({ type: 'GRANDE_MIGRATION' }), []);
   const collectGolden = useCallback(() => dispatch({ type: 'COLLECT_GOLDEN' }), []);
   const conquerZone   = useCallback((id: string) => dispatch({ type: 'CONQUER_ZONE', id }), []);
@@ -148,7 +158,10 @@ export function useGame(weatherMultiplier: number = 1) {
   const clearJustReset = useCallback(() => setJustReset(false), []);
 
   const isBoosterActive = boosterActive;
-  const boosterCooldownLeft = Math.max(0, state.boosterLastUsed + 600 - state.playTimeSeconds);
+  const boosterCooldownLeft = state.boosterCooldownUntil > 0
+    ? Math.max(0, state.boosterCooldownUntil - state.playTimeSeconds)
+    : 0;
+  const boosterRemaining = state.boosterRemaining;
 
   const dismissZoneFull = useCallback(() => setZoneFullQueue(q => q.slice(1)), []);
   const saveNow = useCallback(() => {
@@ -156,5 +169,5 @@ export function useGame(weatherMultiplier: number = 1) {
     AsyncStorage.setItem(SAVE_KEY, JSON.stringify({ ...stateRef.current, lastSavedAt: Date.now() }));
   }, []);
 
-  return { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull, saveNow };
+  return { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, claimSideQuest, upgradeTransport, pullGacha, clearPull, devAddTokens, levelUpHero, assignHero, unassignHero, migrate, collectGolden, conquerZone, upgradeZone, harvestZone, buyWhale, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, boosterRemaining, devJumpToAge, pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains, resetGame, justReset, clearJustReset, giftBananas, upgradeAutoClick, zoneFullQueue, dismissZoneFull, saveNow };
 }

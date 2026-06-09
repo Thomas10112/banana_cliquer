@@ -155,12 +155,33 @@ const toastStyles = StyleSheet.create({
   close: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginLeft: 4 },
 });
 
+const TAVERN_MIN_AGE = 3;
+
+function TavernLockModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <View style={styles.card}>
+          <Text style={styles.emoji}>🔒</Text>
+          <Text style={styles.title}>La Taverne est fermée</Text>
+          <Text style={styles.subtitle}>Fonctionnalité débloquée à l'Ère Moderne.</Text>
+          <Pressable style={[styles.claimBtn, { paddingHorizontal: 28 }]} onPress={onClose}>
+            <Text style={styles.claimTxt}>Compris</Text>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function TabsWithModal() {
   const theme = useAgeTheme();
   const { state, zoneFullQueue, dismissZoneFull } = useGameContext();
   const { hasSeenIntro, completeOnboarding } = useOnboarding();
   const tutorial = useTutorial();
   const [replayIntro, setReplayIntro] = useState(false);
+  const [showTavernLock, setShowTavernLock] = useState(false);
+  const tavernUnlocked = state.currentAge >= TAVERN_MIN_AGE;
   const showingOnboarding = hasSeenIntro === false || replayIntro;
   useAmbiance(state.currentAge, !showingOnboarding);
 
@@ -195,6 +216,26 @@ function TabsWithModal() {
           }}
         />
         <Tabs.Screen
+          name="taverne"
+          options={{
+            title: 'Taverne',
+            tabBarIcon: () => (
+              <View style={tavernUnlocked ? undefined : tavernStyles.lockedIcon}>
+                <Text style={{ fontSize: 22, opacity: tavernUnlocked ? 1 : 0.35 }}>🍺</Text>
+                {!tavernUnlocked && <Text style={tavernStyles.lockBadge}>🔒</Text>}
+              </View>
+            ),
+          }}
+          listeners={{
+            tabPress: (e) => {
+              if (!tavernUnlocked) {
+                e.preventDefault();
+                setShowTavernLock(true);
+              }
+            },
+          }}
+        />
+        <Tabs.Screen
           name="stats"
           options={{
             title: 'Stats',
@@ -211,6 +252,7 @@ function TabsWithModal() {
       </Tabs>
       <OfflineGainsModal />
       <ResetSuccessModal onReplayTutorial={() => setReplayIntro(true)} />
+      <TavernLockModal visible={showTavernLock} onClose={() => setShowTavernLock(false)} />
       {(hasSeenIntro === false || replayIntro) && (
         <OnboardingFlow onComplete={() => {
           completeOnboarding();
@@ -289,4 +331,9 @@ const styles = StyleSheet.create({
   claimTxt: { fontSize: 18, fontWeight: '800', color: '#fff' },
   skipTutorialBtn: { paddingVertical: 8 },
   skipTutorialTxt: { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
+});
+
+const tavernStyles = StyleSheet.create({
+  lockedIcon: { position: 'relative' },
+  lockBadge:  { position: 'absolute', right: -8, bottom: -4, fontSize: 11 },
 });

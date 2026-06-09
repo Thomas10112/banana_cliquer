@@ -91,7 +91,7 @@ En utilisant cette application, vous acceptez les présentes conditions d'utilis
 3. Mises à jour — Des mises à jour peuvent être envoyées automatiquement.
 4. Responsabilité — L'application est fournie "telle quelle" sans garantie.
 
-Contact : support@bananapunch.app`;
+Contact : carotto.dev@laposte.net`;
 
 function MenuPanel({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets  = useSafeAreaInsets();
@@ -164,7 +164,7 @@ function MenuPanel({ visible, onClose }: { visible: boolean; onClose: () => void
           <MenuRow
             emoji="💬"
             label="Service client"
-            onPress={() => Linking.openURL('mailto:support@bananapunch.app')}
+            onPress={() => Linking.openURL('mailto:carotto.dev@laposte.net')}
           />
 
           {/* Paramètres */}

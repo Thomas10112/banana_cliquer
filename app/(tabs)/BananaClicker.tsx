@@ -19,10 +19,12 @@ import { useGameContext } from '@/store/game-context';
 import { formatBananas, formatRate } from '@/utils/format-bananas';
 import { ScrollView } from 'react-native';
 import { QUESTS } from '@/store/quests-config';
+import { SIDE_QUESTS } from '@/store/side-quests-config';
 import { UPGRADES } from '@/store/upgrades-config';
 import { AGES } from '@/store/ages-config';
 import { ZONES } from '@/store/zones-config';
 import { ACHIEVEMENTS } from '@/store/achievements-config';
+import { BOOSTER_DURATION } from '@/store/game-reducer';
 import { BananaButton, BananaButtonHandle } from '@/components/banana-clicker/banana-button';
 import { StatsBar } from '@/components/banana-clicker/stats-bar';
 import { UpgradesPanel } from '@/components/banana-clicker/upgrades-panel';
@@ -474,7 +476,7 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
 }
 
 export default function BananaClicker() {
-  const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, weatherMultiplier, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, upgradeAutoClick } = useGameContext();
+  const { state, bps, bpc, click, buyUpgrade, bulkBuyUpgrade, claimQuest, claimSideQuest, migrate, collectGolden, weatherEmoji, weatherLabel, weatherType, weatherMultiplier, activateBooster, deactivateBooster, isBoosterActive, boosterCooldownLeft, boosterRemaining, upgradeAutoClick } = useGameContext();
   const theme  = useAgeTheme();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
@@ -541,7 +543,16 @@ export default function BananaClicker() {
     () => QUESTS.filter(q => (q.minAge ?? 0) === state.currentAge && q.check(state)).map(q => q.id),
     [state],
   );
-  const unclaimedCount = completedQuestIds.filter(id => !state.claimedQuests.includes(id)).length;
+  const unclaimedAgeCount = completedQuestIds.filter(id => !state.claimedQuests.includes(id)).length;
+  const claimableSideCount = useMemo(
+    () => SIDE_QUESTS.filter(q =>
+      q.minAge <= state.currentAge &&
+      !state.claimedSideQuests.includes(q.id) &&
+      q.check(state),
+    ).length,
+    [state],
+  );
+  const unclaimedCount = unclaimedAgeCount + claimableSideCount;
 
   // Dot vert quand un upgrade se débloque
   useEffect(() => {
@@ -659,6 +670,11 @@ export default function BananaClicker() {
     sounds.playQuest();
   }, [claimQuest, sounds]);
 
+  const handleClaimSide = useCallback((id: string) => {
+    claimSideQuest(id);
+    sounds.playQuest();
+  }, [claimSideQuest, sounds]);
+
   function handleGoldenCollect() {
     collectGolden();
     setGoldenBanana(null);
@@ -769,13 +785,15 @@ export default function BananaClicker() {
           onPress={isBoosterActive ? deactivateBooster : activateBooster}
           disabled={boosterCooldownLeft > 0 && !isBoosterActive}
         >
-          <Text style={styles.boosterEmoji}>{isBoosterActive ? '⏹️' : '🚀'}</Text>
+          <Text style={styles.boosterEmoji}>{isBoosterActive ? '⏸️' : '🚀'}</Text>
           <Text style={styles.boosterTxt}>
             {isBoosterActive
-              ? `BOOST ACTIF — ${Math.ceil(state.boosterLastUsed + 120 - state.playTimeSeconds)}s · Stopper`
+              ? `BOOST ×3 — ${Math.ceil(boosterRemaining)}s · Pause`
               : boosterCooldownLeft > 0
               ? `Recharge — ${Math.ceil(boosterCooldownLeft / 60)}min`
-              : '×3 BPS · 2 min'}
+              : boosterRemaining < BOOSTER_DURATION
+              ? `×3 BPS · ${Math.ceil(boosterRemaining)}s dispo`
+              : '×3 BPS · 3 min'}
           </Text>
         </Pressable>
       )}
@@ -904,7 +922,7 @@ export default function BananaClicker() {
           currentAge={state.currentAge}
         />
       ) : (
-        <QuestsPanel state={state} onClaim={handleClaim} />
+        <QuestsPanel state={state} onClaim={handleClaim} onClaimSide={handleClaimSide} />
       )}
       {/* Ref invisible pour mesurer la zone panel */}
       <View ref={panelRef} style={StyleSheet.absoluteFill} pointerEvents="none" />

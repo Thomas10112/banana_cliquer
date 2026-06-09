@@ -1,11 +1,11 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { QuestConfig } from '@/store/quests-config';
+import { BaseQuest } from '@/store/quests-config';
 import { GameState } from '@/store/types';
 import { formatBananas } from '@/utils/format-bananas';
 
 interface QuestCardProps {
-  quest: QuestConfig;
+  quest: BaseQuest & { emoji?: string };
   state: GameState;
   claimed: boolean;
   onClaim: (id: string) => void;
@@ -20,7 +20,7 @@ export function QuestCard({ quest, state, claimed, onClaim }: QuestCardProps) {
   return (
     <View style={[styles.card, readyToClaim && styles.cardReady, claimed && styles.cardDone]}>
       <View style={styles.header}>
-        <Text style={styles.title}>{quest.title}</Text>
+        <Text style={styles.title}>{quest.emoji ? `${quest.emoji} ` : ''}{quest.title}</Text>
         {claimed && <Text style={styles.check}>✓</Text>}
       </View>
       <Text style={styles.description}>{quest.description}</Text>

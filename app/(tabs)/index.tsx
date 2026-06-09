@@ -13,10 +13,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useGameContext } from '@/store/game-context';
 import { AGES } from '@/store/ages-config';
 import { registerTutorialRef } from '@/utils/tutorial-refs';
 import { ZONES, zoneBonusLabel, getZoneUpgradeCost, getZoneMaxStock, getWhaleCost } from '@/store/zones-config';
+import { heroStockMult } from '@/store/hero-effects';
+import { TRANSPORT_MAX_LEVEL, getTransportCargoMult, getTransportSpeedMult, getTransportUpgradeCost } from '@/store/transport-config';
 import { formatBananas } from '@/utils/format-bananas';
 import type { WhaleTrip } from '@/store/types';
 
@@ -43,6 +46,7 @@ interface POI {
   id: string;
   label: string;
   emoji: string;
+  image?: any;       // icône de zone (remplace l'emoji quand présente)
   xPct: number;
   yPct: number;
   description: string;
@@ -105,15 +109,15 @@ const AGE_POIS: Record<number, POI[]> = {
   3: [
     { id: 'silicon_valley', label: 'Silicon Valley',    emoji: '💻', xPct: 0.18, yPct: 0.34,
       description: 'Des garages aux serveurs géants, chaque ligne de code ici peut changer la valeur mondiale de la banane.' },
-    { id: 'geneve',         label: 'CERN — Genève',     emoji: '🔬', xPct: 0.50, yPct: 0.24,
+    { id: 'geneve',         label: 'CERN — Genève',     emoji: '🔬', image: require('@/assets/images/maps/map_ere_moderne/cern_geneve.png'), xPct: 0.50, yPct: 0.24,
       description: 'Des physiciens cherchent à comprendre l\'univers. En attendant, leurs supercalculateurs optimisent la production bananière.' },
-    { id: 'seoul',          label: 'Seoul Tech Park',   emoji: '📱', xPct: 0.82, yPct: 0.27,
+    { id: 'seoul',          label: 'Seoul Tech Park',   emoji: '📱', image: require('@/assets/images/maps/map_ere_moderne/seoul_tech_park.png'), xPct: 0.82, yPct: 0.27,
       description: 'Puces, écrans, robots. Cette mégapole produit les composants qui font tourner toutes les usines à bananes du monde.' },
-    { id: 'bangalore',      label: 'Bangalore Digital', emoji: '🛰️', xPct: 0.71, yPct: 0.41,
+    { id: 'bangalore',      label: 'Bangalore Digital', emoji: '🛰️', image: require('@/assets/images/maps/map_ere_moderne/bangalore_digital.png'), xPct: 0.71, yPct: 0.41,
       description: 'Des milliers d\'ingénieurs logiciels coordonnent depuis ici les drones de livraison de bananes en temps réel.' },
-    { id: 'houston',        label: 'Centre Spatial',    emoji: '🚀', xPct: 0.08, yPct: 0.65,
+    { id: 'houston',        label: 'Centre Spatial',    emoji: '🚀', image: require('@/assets/images/maps/map_ere_moderne/centre_spatial.png'), xPct: 0.08, yPct: 0.65,
       description: 'De là sont lancés les satellites qui cartographient chaque plantation bananière sur Terre depuis l\'orbite basse.' },
-    { id: 'tokyo',          label: 'Tokyo Numérique',   emoji: '🖥️', xPct: 0.85, yPct: 0.33,
+    { id: 'tokyo',          label: 'Tokyo Numérique',   emoji: '🖥️', image: require('@/assets/images/maps/map_ere_moderne/tokyo_numerique.png'), xPct: 0.85, yPct: 0.33,
       description: 'La ville la plus connectée du monde. Ici, des IA ultra-perfectionnées gèrent la distribution mondiale des bananes.' },
   ],
   4: [
@@ -285,6 +289,13 @@ const WhaleMarker = React.memo(function WhaleMarker({ trip, pois, playTime, tran
 
 // ─── POI Marker ───────────────────────────────────────────────────────────────
 
+// Icône de zone — les images sont déjà cropées à la source, on les rend telles quelles.
+function ZoneIcon({ source, size }: { source: any; size: number }) {
+  return (
+    <ExpoImage source={source} style={{ width: size, height: size }} contentFit="contain" />
+  );
+}
+
 const POIMarker = React.memo(function POIMarker({
   poi, level, stock, maxStock, onPress,
 }: { poi: POI; level: number; stock: number; maxStock: number; onPress: (p: POI) => void }) {
@@ -303,7 +314,9 @@ const POIMarker = React.memo(function POIMarker({
           <Text style={styles.stockTxt}>🍌 {formatBananas(stock)}</Text>
         </View>
       )}
-      <Text style={styles.markerEmoji}>{poi.emoji}</Text>
+      {poi.image
+        ? <ZoneIcon source={poi.image} size={44} />
+        : <Text style={styles.markerEmoji}>{poi.emoji}</Text>}
       <View style={[styles.markerBubble, conquered && styles.markerBubbleConquered]}>
         <Text style={styles.markerLabel} numberOfLines={1}>
           {conquered ? '' : ''}{poi.label}
@@ -337,17 +350,18 @@ interface POIDetailProps {
   bananas: number;
   zoneLevels: Record<string, number>;
   zoneStocks: Record<string, number>;
+  stockMult: number;
   onConquer: (id: string) => void;
   onUpgrade: (id: string) => void;
   onHarvest: (id: string) => void;
   onClose: () => void;
 }
 
-function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade, onHarvest, onClose }: POIDetailProps) {
+function POIDetail({ poi, bananas, zoneLevels, zoneStocks, stockMult, onConquer, onUpgrade, onHarvest, onClose }: POIDetailProps) {
   const zone       = ZONES.find(z => z.id === poi.id);
   const level      = zoneLevels[poi.id] ?? 0;
   const stock      = zoneStocks[poi.id] ?? 0;
-  const maxStock   = getZoneMaxStock(level);
+  const maxStock   = Math.floor(getZoneMaxStock(level) * stockMult);
   const isConquered = level >= 1;
   const canAfford  = zone ? bananas >= zone.cost : false;
   const upgCost    = zone && level >= 1 && level < 3 ? getZoneUpgradeCost(zone, level) : null;
@@ -357,14 +371,16 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
     <View style={styles.detailOverlay} pointerEvents="box-none">
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       <View style={styles.detailCard}>
-        <Text style={styles.detailEmoji}>{poi.emoji}</Text>
+        {poi.image
+          ? <ZoneIcon source={poi.image} size={72} />
+          : <Text style={styles.detailEmoji}>{poi.emoji}</Text>}
         <Text style={styles.detailTitle}>{poi.label}</Text>
         <Text style={styles.detailDesc}>{poi.description}</Text>
 
         {zone && !isConquered && (
           <Pressable
             style={[styles.conquerBtn, !canAfford && styles.conquerBtnDisabled]}
-            onPress={() => { if (canAfford) { onConquer(poi.id); onClose(); } }}
+            onPress={() => { if (canAfford) onConquer(poi.id); }}
           >
             <Text style={styles.conquerBtnTxt}>
               {canAfford ? `⚔️ Conquérir — ${formatBananas(zone.cost)} 🍌` : `🔒 ${formatBananas(zone.cost)} 🍌 requis`}
@@ -387,7 +403,7 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
             <View style={styles.stockRow}>
               <Text style={styles.stockLabel}>🍌 Stock : {formatBananas(stock)} / {formatBananas(maxStock)}</Text>
               {stock > 0 && (
-                <Pressable style={styles.harvestBtn} onPress={() => { onHarvest(poi.id); onClose(); }}>
+                <Pressable style={styles.harvestBtn} onPress={() => onHarvest(poi.id)}>
                   <Text style={styles.harvestBtnTxt}>Récolter</Text>
                 </Pressable>
               )}
@@ -397,7 +413,7 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
             {level < 3 && upgCost !== null && (
               <Pressable
                 style={[styles.upgradeBtn, !canUpgrade && styles.conquerBtnDisabled]}
-                onPress={() => { if (canUpgrade) { onUpgrade(poi.id); onClose(); } }}
+                onPress={() => { if (canUpgrade) onUpgrade(poi.id); }}
               >
                 <Text style={styles.conquerBtnTxt}>
                   {canUpgrade
@@ -405,7 +421,7 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
                     : `🔒 ${formatBananas(upgCost)} 🍌 requis`}
                 </Text>
                 <Text style={styles.bonusTxtSmall}>
-                  Stock max : {getZoneMaxStock(level + 1)} 🍌
+                  Stock max : {formatBananas(Math.floor(getZoneMaxStock(level + 1) * stockMult))} 🍌
                 </Text>
               </Pressable>
             )}
@@ -423,7 +439,7 @@ function POIDetail({ poi, bananas, zoneLevels, zoneStocks, onConquer, onUpgrade,
 
 // ─── Territory summary panel ──────────────────────────────────────────────────
 
-function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, transport, onClose, onSelect, onConquer, onUpgrade, onBuyWhale }: {
+function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, transport, onClose, onSelect, onConquer, onUpgrade, onBuyWhale, crewUnlocked, transportLevel, onUpgradeTransport, onOpenTaverne }: {
   pois: POI[];
   zoneLevels: Record<string, number>;
   zoneStocks: Record<string, number>;
@@ -435,10 +451,20 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
   onConquer: (id: string) => void;
   onUpgrade: (id: string) => void;
   onBuyWhale: () => void;
+  crewUnlocked: boolean;
+  transportLevel: number;
+  onUpgradeTransport: () => void;
+  onOpenTaverne: () => void;
 }) {
   const conqueredCount = pois.filter(p => (zoneLevels[p.id] ?? 0) >= 1).length;
   const whaleCost = getWhaleCost(whalesOwned);
   const canBuyWhale = bananas >= whaleCost && conqueredCount >= 2;
+
+  const tMaxed     = transportLevel >= TRANSPORT_MAX_LEVEL;
+  const tCost      = getTransportUpgradeCost(transportLevel);
+  const tCanAfford = !tMaxed && bananas >= tCost;
+  const cargoBonus = Math.round((getTransportCargoMult(transportLevel) - 1) * 100);
+  const speedBonus = Math.round((1 - getTransportSpeedMult(transportLevel)) * 100);
 
   return (
     <View style={styles.panelOverlay} pointerEvents="box-none">
@@ -462,6 +488,33 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
             {whalesOwned > 0 && <Text style={styles.whaleBtnSub}>{whalesOwned} {transport.namePlural}</Text>}
           </View>
         </Pressable>
+
+        {/* Amélioration du transport (Taverne) */}
+        {crewUnlocked && (
+          <View style={styles.transportRow}>
+            <Pressable
+              style={[styles.transportUpBtn, !tCanAfford && !tMaxed && styles.whaleBtnDisabled]}
+              onPress={() => { if (tCanAfford) onUpgradeTransport(); }}
+            >
+              <Text style={styles.whaleBtnEmoji}>📦</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.whaleBtnTxt}>
+                  {tMaxed
+                    ? `${transport.name} — niveau max ✓`
+                    : tCanAfford
+                      ? `Améliorer le transport — ${formatBananas(tCost)} 🍌`
+                      : `🔒 ${formatBananas(tCost)} 🍌 requis`}
+                </Text>
+                <Text style={styles.whaleBtnSub}>
+                  Niv. {transportLevel}/{TRANSPORT_MAX_LEVEL} · +{cargoBonus}% cargo · −{speedBonus}% trajet
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable style={styles.tavernShortcut} onPress={onOpenTaverne}>
+              <Text style={styles.tavernShortcutTxt}>🍺</Text>
+            </Pressable>
+          </View>
+        )}
 
         <ScrollView style={styles.panelScroll} showsVerticalScrollIndicator={false}>
           {pois.map(poi => {
@@ -495,7 +548,9 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
                   {!isConquered ? '🔨' : isMaxed ? '✅' : '⬆️'}
                 </Text>
 
-                <Text style={styles.panelRowEmoji}>{poi.emoji}</Text>
+                {poi.image
+                  ? <ZoneIcon source={poi.image} size={36} />
+                  : <Text style={styles.panelRowEmoji}>{poi.emoji}</Text>}
 
                 <View style={styles.panelRowInfo}>
                   <Text style={[styles.panelRowName, isCantAfford && styles.panelRowNameDim]}>
@@ -547,8 +602,10 @@ function TerritoryPanel({ pois, zoneLevels, zoneStocks, bananas, whalesOwned, tr
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function WorldMapScreen() {
-  const { state, conquerZone, upgradeZone, harvestZone, buyWhale } = useGameContext();
+  const { state, conquerZone, upgradeZone, harvestZone, buyWhale, upgradeTransport } = useGameContext();
   const isFocused = useIsFocused();
+  const router = useRouter();
+  const crewUnlocked = state.currentAge >= 3;
   const mapAreaRef    = useRef<View>(null);
   const mapPanelBtnRef = useRef<any>(null);
   const firstPoiRef   = useRef<View>(null);
@@ -563,11 +620,20 @@ export default function WorldMapScreen() {
   const [followedWhaleIdx, setFollowedWhaleIdx] = useState<number | null>(null);
   const [indicators, setIndicators]            = useState<IndicatorData[]>([]);
   const [mapLoaded, setMapLoaded]              = useState(false);
+  const [showAgeMenu, setShowAgeMenu]          = useState(false);
 
   const age       = AGES[state.currentAge];
   const mapSrc    = AGE_MAPS[state.currentAge];
   const pois      = AGE_POIS[state.currentAge] ?? [];
   const transport = AGE_TRANSPORT[state.currentAge] ?? AGE_TRANSPORT[0];
+
+  // Filet de sécurité : ne jamais rester bloqué sur l'overlay de chargement
+  // (si onLoad/onError de la carte ne se déclenche pas, on révèle quand même la carte).
+  useEffect(() => {
+    if (mapLoaded) return;
+    const t = setTimeout(() => setMapLoaded(true), 2500);
+    return () => clearTimeout(t);
+  }, [mapLoaded]);
 
   // Quand la carte n'est pas l'écran actif, on gèle l'heure de jeu transmise
   // aux baleines : leurs props deviennent stables → React.memo coupe les
@@ -709,6 +775,7 @@ export default function WorldMapScreen() {
                 contentFit="cover"
                 cachePolicy="memory-disk"
                 onLoad={() => setMapLoaded(true)}
+                onError={() => setMapLoaded(true)}
               />
             ) : (
               <View style={[styles.mapImage, styles.mapPlaceholder]}>
@@ -749,7 +816,7 @@ export default function WorldMapScreen() {
                 poi={poi}
                 level={state.zoneLevels[poi.id] ?? 0}
                 stock={state.zoneStocks[poi.id] ?? 0}
-                maxStock={getZoneMaxStock(state.zoneLevels[poi.id] ?? 0)}
+                maxStock={Math.floor(getZoneMaxStock(state.zoneLevels[poi.id] ?? 0) * heroStockMult(state))}
                 onPress={setSelectedPOI}
               />
             ))}
@@ -775,10 +842,11 @@ export default function WorldMapScreen() {
       {/* Header */}
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="box-none">
         <View style={styles.headerRow}>
-          <View style={styles.ageBadge}>
+          <Pressable style={styles.ageBadge} onPress={() => setShowAgeMenu(v => !v)}>
             <Text style={styles.ageEmoji}>{age?.emoji}</Text>
             <Text style={styles.ageName}>{age?.name}</Text>
-          </View>
+            <Text style={styles.ageChevron}>{showAgeMenu ? '▲' : '▼'}</Text>
+          </Pressable>
           <Pressable ref={mapPanelBtnRef} style={styles.iconBtn} onPress={() => setShowTerritories(true)}>
             <Text style={styles.iconBtnTxt}>📋</Text>
             {conqueredCount > 0 && (
@@ -803,6 +871,37 @@ export default function WorldMapScreen() {
         </View>
       </SafeAreaView>
 
+      {/* Menu déroulant des ères (timeline déco) */}
+      {showAgeMenu && (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowAgeMenu(false)} />
+          <SafeAreaView style={styles.ageMenuWrap} edges={['top']} pointerEvents="box-none">
+            <View style={styles.ageMenu}>
+              {AGES.map((a) => {
+                const isCurrent = a.id === state.currentAge;
+                const isDone    = a.id < state.currentAge;
+                const isLocked  = a.id > state.currentAge;
+                return (
+                  <View
+                    key={a.id}
+                    style={[styles.ageMenuRow, isCurrent && styles.ageMenuRowCurrent]}
+                  >
+                    <Text style={styles.ageMenuMarker}>
+                      {isCurrent ? '●' : isDone ? '✓' : '🔒'}
+                    </Text>
+                    <Text style={[styles.ageMenuEmoji, isLocked && styles.ageMenuLocked]}>{a.emoji}</Text>
+                    <Text style={[styles.ageMenuName, isCurrent && styles.ageMenuNameCurrent, isLocked && styles.ageMenuLocked]}>
+                      {a.name}
+                    </Text>
+                    {isCurrent && <Text style={styles.ageMenuHere}>vous êtes ici</Text>}
+                  </View>
+                );
+              })}
+            </View>
+          </SafeAreaView>
+        </>
+      )}
+
       {/* POI detail */}
       {selectedPOI && !showTerritories && (
         <POIDetail
@@ -810,6 +909,7 @@ export default function WorldMapScreen() {
           bananas={state.bananas}
           zoneLevels={state.zoneLevels}
           zoneStocks={state.zoneStocks}
+          stockMult={heroStockMult(state)}
           onConquer={conquerZone}
           onUpgrade={upgradeZone}
           onHarvest={harvestZone}
@@ -845,6 +945,10 @@ export default function WorldMapScreen() {
           onConquer={(id) => conquerZone(id)}
           onUpgrade={(id) => upgradeZone(id)}
           onBuyWhale={buyWhale}
+          crewUnlocked={crewUnlocked}
+          transportLevel={state.transportLevels[state.currentAge] ?? 0}
+          onUpgradeTransport={upgradeTransport}
+          onOpenTaverne={() => { setShowTerritories(false); router.navigate('/taverne' as any); }}
         />
       )}
     </View>
@@ -884,6 +988,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3,
   },
+  markerImage: { width: 44, height: 44 },
   markerBubble:          { backgroundColor: 'rgba(0,0,0,0.65)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, maxWidth: 120, alignItems: 'center' },
   markerBubbleConquered: { backgroundColor: 'rgba(180,120,0,0.85)', borderWidth: 1, borderColor: '#ffd700' },
   markerLabel:           { fontSize: 10, color: '#fff', fontWeight: '600', textAlign: 'center' },
@@ -910,6 +1015,25 @@ const styles = StyleSheet.create({
   },
   ageEmoji:   { fontSize: 18 },
   ageName:    { fontSize: 15, fontWeight: '700', color: '#fff' },
+  ageChevron: { fontSize: 10, color: 'rgba(255,255,255,0.7)', marginLeft: 2 },
+  // Menu déroulant des ères
+  ageMenuWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', paddingTop: 52 },
+  ageMenu: {
+    backgroundColor: 'rgba(20,20,30,0.96)', borderRadius: 16, padding: 8, gap: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', minWidth: 240,
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  ageMenuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10,
+  },
+  ageMenuRowCurrent: { backgroundColor: 'rgba(249,168,37,0.18)' },
+  ageMenuMarker: { fontSize: 13, color: '#f9a825', width: 18, textAlign: 'center' },
+  ageMenuEmoji:  { fontSize: 18 },
+  ageMenuName:   { fontSize: 14, fontWeight: '600', color: '#fff', flex: 1 },
+  ageMenuNameCurrent: { fontWeight: '800', color: '#ffd54f' },
+  ageMenuHere:   { fontSize: 10, fontWeight: '700', color: '#f9a825' },
+  ageMenuLocked: { opacity: 0.4 },
   iconBtn:    {
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, width: 38, height: 38,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
@@ -942,6 +1066,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   detailEmoji:    { fontSize: 44 },
+  detailImage:    { width: 72, height: 72, marginBottom: 4 },
   detailTitle:    { fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center' },
   detailDesc:     { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 20 },
   conqueredBadge: {
@@ -977,6 +1102,10 @@ const styles = StyleSheet.create({
   whaleBtnEmoji: { fontSize: 28 },
   whaleBtnTxt:   { fontSize: 13, fontWeight: '700', color: '#fff', flexShrink: 1 },
   whaleBtnSub:   { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  transportRow:  { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginBottom: 10 },
+  transportUpBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(180,120,0,0.25)', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)' },
+  tavernShortcut: { width: 52, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(120,60,20,0.4)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,180,90,0.4)' },
+  tavernShortcutTxt: { fontSize: 24 },
   panelScroll: { flexGrow: 0 },
   panelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
   panelRowConquered:   { backgroundColor: 'rgba(180,120,0,0.15)', borderColor: 'rgba(255,215,0,0.2)' },
@@ -984,6 +1113,7 @@ const styles = StyleSheet.create({
   panelRowCantAfford:  { opacity: 0.45 },
   panelRowStateIcon:   { fontSize: 18, width: 24, textAlign: 'center' },
   panelRowEmoji:       { fontSize: 26 },
+  panelRowImage:       { width: 32, height: 32 },
   panelRowInfo:        { flex: 1 },
   panelRowName:        { fontSize: 14, fontWeight: '700', color: '#fff' },
   panelRowNameDim:     { color: 'rgba(255,255,255,0.5)' },

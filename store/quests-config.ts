@@ -1,13 +1,17 @@
 import { GameState } from './types';
 
-export interface QuestConfig {
+/** Forme minimale d'une quête réclamable — partagée par les quêtes d'âge et secondaires. */
+export interface BaseQuest {
   id: string;
   title: string;
   description: string;
-  minAge?: number;
   reward: number; // bananes reçues en réclamant la quête
   check: (state: GameState) => boolean;
   progress: (state: GameState) => { current: number; total: number };
+}
+
+export interface QuestConfig extends BaseQuest {
+  minAge?: number;
 }
 
 export const QUESTS: QuestConfig[] = [

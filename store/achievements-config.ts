@@ -235,7 +235,7 @@ export const ACHIEVEMENTS: AchievementConfig[] = [
     id: 'acceleration',
     title: '💨 Accélération',
     description: 'Activer l\'Accélérateur pour la première fois',
-    check: s => s.boosterLastUsed > -9999,
+    check: s => s.boosterActive || s.boosterCooldownUntil > 0 || s.boosterRemaining < 180,
   },
 
   // ── Temps de jeu ────────────────────────────────────────────────────────────
