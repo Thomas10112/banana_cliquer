@@ -47,8 +47,8 @@ export const ZONES: ZoneConfig[] = [
   { id: 'amazonie',  minAge: 0, cost: 200,   bonus: { bpsMultiplier: 0.10 } },
   { id: 'europe',    minAge: 0, cost: 500,   bonus: { bpsMultiplier: 0.15 } },
   { id: 'asie',      minAge: 0, cost: 1000,  bonus: { clickBonus: 0.5 } },
-  { id: 'australie', minAge: 0, cost: 2500,  bonus: { bpsMultiplier: 0.20 } },
-  { id: 'mammouth',  minAge: 0, cost: 5000,  bonus: { clickBonus: 1 } },
+  { id: 'australie', minAge: 0, cost: 1500,  bonus: { bpsMultiplier: 0.20 } },
+  { id: 'mammouth',  minAge: 0, cost: 2500,  bonus: { clickBonus: 1 } },
 
   // ── Ère Agricole (age 1) ─────────────────────────────────────────────────
   { id: 'nil',       minAge: 1, cost: 500,   bonus: { bpsMultiplier: 0.10 } },

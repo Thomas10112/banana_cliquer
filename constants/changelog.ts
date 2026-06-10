@@ -16,6 +16,17 @@ export interface ChangelogEntry {
 // ⬇️ La plus récente EN PREMIER.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.2.1",
+    date: "10 juin 2026",
+    title: "Grand Équilibrage",
+    items: [
+      "⚖️ Rééquilibrage complet de l'économie : les coûts des améliorations ont été revus sur les 5 âges",
+      "🚁 L'Ère Moderne offre désormais une vraie progression (fini les améliorations quasi gratuites)",
+      "🌿 Zones Australie et Mammouth moins chères : la fin de l'Ère Sauvage est plus fluide",
+      "🤖 L'Ère Robotique se mérite : l'endgame dure plus longtemps",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "9 juin 2026",
     title: "La Taverne",
