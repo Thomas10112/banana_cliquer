@@ -1,6 +1,7 @@
 import { useAudioPlayer } from 'expo-audio';
 import { useCallback } from 'react';
 import { duckMusic } from '@/utils/music-bus';
+import { getSettings } from '@/hooks/use-settings';
 
 export function useSounds() {
   // Âge 0
@@ -33,6 +34,8 @@ export function useSounds() {
   const ageTransitionPlayer = useAudioPlayer(require('@/assets/sounds/ambiances/transfert.aac'));
 
   const playBuy = useCallback((upgradeId: string) => {
+    const { soundEnabled, sfxVolume } = getSettings();
+    if (!soundEnabled || sfxVolume <= 0) return;
     const player =
       upgradeId === 'guerrier_massai'  ? guerrierPlayer   :
       upgradeId === 'bananier'         ? bananierPlayer   :
@@ -53,7 +56,7 @@ export function useSounds() {
       upgradeId === 'ia'               ? iaPlayer         :
       upgradeId === 'megastructure'    ? megastructurePlayer :
                                          monkeyPlayer;
-    player.volume = 1;   // SFX d'upgrade au volume plein (sans dépasser)
+    player.volume = sfxVolume;
     duckMusic();         // baisse brièvement la musique d'ambiance
     player.seekTo(0);
     player.play();
@@ -62,17 +65,25 @@ export function useSounds() {
       ouvrierPlayer, machinePlayer, usinePlayer, locomotivePlayer, ingenieurPlayer, ordinateurPlayer, dronePlayer, satellitePlayer, robotPlayer, iaPlayer, megastructurePlayer]);
 
   const playQuest = useCallback(() => {
+    const { soundEnabled, sfxVolume } = getSettings();
+    if (!soundEnabled || sfxVolume <= 0) return;
+    questPlayer.volume = sfxVolume;
     questPlayer.seekTo(0);
     questPlayer.play();
   }, [questPlayer]);
 
   const playMigration = useCallback(() => {
+    const { soundEnabled, sfxVolume } = getSettings();
+    if (!soundEnabled || sfxVolume <= 0) return;
+    migrationPlayer.volume = sfxVolume;
     migrationPlayer.seekTo(0);
     migrationPlayer.play();
   }, [migrationPlayer]);
 
   const playAgeTransition = useCallback(() => {
-    ageTransitionPlayer.volume = 1;
+    const { soundEnabled, sfxVolume } = getSettings();
+    if (!soundEnabled || sfxVolume <= 0) return;
+    ageTransitionPlayer.volume = sfxVolume;
     duckMusic();
     ageTransitionPlayer.seekTo(0);
     ageTransitionPlayer.play();
@@ -80,7 +91,9 @@ export function useSounds() {
 
   // Fin de jeu — cri louphoque (chewbacca) par-dessus la musique baissée
   const playEndGame = useCallback(() => {
-    girafePlayer.volume = 1;
+    const { soundEnabled, sfxVolume } = getSettings();
+    if (!soundEnabled || sfxVolume <= 0) return;
+    girafePlayer.volume = sfxVolume;
     duckMusic();
     girafePlayer.seekTo(0);
     girafePlayer.play();

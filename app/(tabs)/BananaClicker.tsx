@@ -35,6 +35,7 @@ import { AchievementNotification } from '@/components/banana-clicker/achievement
 import { QuestNotification } from '@/components/banana-clicker/quest-notification';
 import { WeatherOverlay } from '@/components/banana-clicker/weather-overlay';
 import { EndGameCelebration } from '@/components/banana-clicker/end-game-celebration';
+import { SettingsModal } from '@/components/settings-modal';
 import { useSounds } from '@/hooks/use-sounds';
 import { useProfile } from '@/hooks/use-profile';
 import { useAgeTheme } from '@/hooks/use-age-theme';
@@ -548,6 +549,7 @@ export default function BananaClicker() {
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showMigrationAnim, setShowMigrationAnim]   = useState(false);
   const [showEndGame, setShowEndGame]               = useState(false);
+  const [showSettings, setShowSettings]             = useState(false);
 
   const prevClaimed      = useRef<string[]>(state.claimedQuests);
   const prevAchievements = useRef<string[]>(state.unlockedAchievements);
@@ -839,7 +841,13 @@ export default function BananaClicker() {
             onExpire={handleGoldenExpire}
           />
         )}
+        {/* Roue crantée — paramètres son */}
+        <Pressable style={styles.settingsBtn} onPress={() => setShowSettings(true)} hitSlop={8}>
+          <Text style={styles.settingsEmoji}>⚙️</Text>
+        </Pressable>
       </ImageBackground>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       {/* Booster */}
       {state.boosterUnlocked && (
@@ -1113,6 +1121,20 @@ const styles = StyleSheet.create({
   migrationBtnLocked:  { backgroundColor: '#4e342e', borderColor: '#8d6e63' },
   migrationBtnAge:     { backgroundColor: '#0d47a1', borderColor: '#42a5f5' },
   finishedBanner:      { backgroundColor: '#4a3500', borderColor: '#ffd700' },
+  settingsBtn: {
+    position: 'absolute',
+    bottom: 10,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20,20,50,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsEmoji: { fontSize: 20 },
   boosterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#1a237e', paddingHorizontal: 16, paddingVertical: 10,

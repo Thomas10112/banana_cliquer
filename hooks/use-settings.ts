@@ -6,9 +6,11 @@ const KEY = 'banana_clicker_settings_v1';
 export interface Settings {
   musicEnabled: boolean;
   soundEnabled: boolean;
+  musicVolume: number; // 0..1 — curseur utilisateur, appliqué sur le volume de base de la musique
+  sfxVolume: number;   // 0..1 — volume des effets sonores
 }
 
-const DEFAULT: Settings = { musicEnabled: true, soundEnabled: true };
+const DEFAULT: Settings = { musicEnabled: true, soundEnabled: true, musicVolume: 0.5, sfxVolume: 1 };
 let _current: Settings = { ...DEFAULT };
 let _listeners: Array<(s: Settings) => void> = [];
 let _loaded = false;
@@ -35,7 +37,7 @@ export function useSettings() {
     return () => { _listeners = _listeners.filter(fn => fn !== setSettings); };
   }, []);
 
-  async function set(key: keyof Settings, value: boolean) {
+  async function set<K extends keyof Settings>(key: K, value: Settings[K]) {
     _current = { ..._current, [key]: value };
     broadcast();
     await AsyncStorage.setItem(KEY, JSON.stringify(_current));

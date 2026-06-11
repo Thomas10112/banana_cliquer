@@ -18,6 +18,7 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { useWhatsNew } from '@/hooks/use-whats-new';
 import { WhatsNewModal } from '@/components/whats-new-modal';
 import { UpdatePrompt } from '@/components/update-prompt';
+import { VolumeSlider } from '@/components/settings-modal';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const VERSION  = Constants.expoConfig?.version ?? '1.0.0';
@@ -181,6 +182,13 @@ function MenuPanel({ visible, onClose }: { visible: boolean; onClose: () => void
               />
             }
           />
+          <View style={m.sliderRow}>
+            <VolumeSlider
+              value={settings.musicVolume}
+              onChange={v => set('musicVolume', v)}
+              disabled={!settings.musicEnabled}
+            />
+          </View>
           <MenuRow
             emoji="🔔"
             label="Effets sonores"
@@ -193,6 +201,13 @@ function MenuPanel({ visible, onClose }: { visible: boolean; onClose: () => void
               />
             }
           />
+          <View style={m.sliderRow}>
+            <VolumeSlider
+              value={settings.sfxVolume}
+              onChange={v => set('sfxVolume', v)}
+              disabled={!settings.soundEnabled}
+            />
+          </View>
         </ScrollView>
 
         <Text style={m.version}>Banana Punch v{VERSION}</Text>
@@ -399,6 +414,10 @@ const m = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 15, color: '#ebebeb', fontWeight: '500' },
   rowRight: { minWidth: 28, alignItems: 'flex-end' },
   chevron:  { fontSize: 22, color: 'rgba(255,255,255,0.25)', marginRight: -4 },
+  sliderRow: {
+    paddingHorizontal: 20, paddingLeft: 62, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
 
   version: {
     textAlign: 'center', fontSize: 12,

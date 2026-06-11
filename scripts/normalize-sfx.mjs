@@ -15,11 +15,8 @@ import ffmpeg from 'ffmpeg-static';
 const DRY  = process.argv.includes('--dry-run');
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const TARGET_MEAN_DB = -15;  // niveau moyen visé
-const CEILING_DB     = -0.5; // crête max après gain (anti-clipping)
-
 // SFX joués par use-sounds.ts à l'achat d'un upgrade
-const FILES = [
+const SFX_FILES = [
   'assets/sounds/age-0/mixkit-monkey-excited-screech-105.wav',
   'assets/sounds/age-0/guerrier.mp3',
   'assets/sounds/age-0/cest-moi-qui-les-ai-plantes-planteees.mp3',
@@ -41,6 +38,20 @@ const FILES = [
   'assets/sounds/age-4/megasturucture.mp3',
 ];
 
+// Musiques d'ambiance (use-ambiance.ts) — niveau « fond sonore », bien sous les SFX
+const AMBIANCE_FILES = [
+  'assets/sounds/ambiances/ere_sauvage_ambiance.mp3',
+  'assets/sounds/ambiances/ere_agricole_ambiance.mp3',
+  'assets/sounds/ambiances/ere_industrielle_ambiance.mp3',
+  'assets/sounds/ambiances/ere_moderne_ambiance.mp3',
+  'assets/sounds/ambiances/ere_robotique_ambiance.mp3',
+];
+
+const GROUPS = [
+  { name: 'SFX upgrades',       files: SFX_FILES,      targetMean: -15, ceiling: -0.5 },
+  { name: 'Musiques ambiance',  files: AMBIANCE_FILES, targetMean: -20, ceiling: -3 },
+];
+
 function detect(file) {
   const r = spawnSync(ffmpeg, ['-hide_banner', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'],
     { cwd: ROOT, encoding: 'utf8' });
@@ -52,31 +63,34 @@ function detect(file) {
 }
 
 let failed = 0;
-for (const file of FILES) {
-  let m;
-  try { m = detect(file); } catch (e) { console.error(`❌ ${e.message}`); failed++; continue; }
+for (const group of GROUPS) {
+  console.log(`\n── ${group.name} (cible ${group.targetMean} dB, crête max ${group.ceiling} dB) ──`);
+  for (const file of group.files) {
+    let m;
+    try { m = detect(file); } catch (e) { console.error(`❌ ${e.message}`); failed++; continue; }
 
-  let gain = TARGET_MEAN_DB - m.mean;
-  if (m.max + gain > CEILING_DB) gain = CEILING_DB - m.max; // plafonne pour éviter la saturation
+    let gain = group.targetMean - m.mean;
+    if (m.max + gain > group.ceiling) gain = group.ceiling - m.max; // plafonne pour éviter la saturation
 
-  const label = `${file}  (moy ${m.mean} dB, crête ${m.max} dB)`;
-  if (Math.abs(gain) < 0.5) { console.log(`= ${label} — déjà au niveau`); continue; }
-  if (DRY) { console.log(`→ ${label} : gain ${gain.toFixed(1)} dB`); continue; }
+    const label = `${file}  (moy ${m.mean} dB, crête ${m.max} dB)`;
+    if (Math.abs(gain) < 0.5) { console.log(`= ${label} — déjà au niveau`); continue; }
+    if (DRY) { console.log(`→ ${label} : gain ${gain.toFixed(1)} dB`); continue; }
 
-  const ext = extname(file).toLowerCase();
-  const tmp = join(ROOT, file + '.tmp' + ext);
-  const codec = ext === '.wav' ? ['-c:a', 'pcm_s16le'] : ['-c:a', 'libmp3lame', '-q:a', '2'];
-  const r = spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', file,
-    '-af', `volume=${gain.toFixed(2)}dB`, ...codec, tmp], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0) {
-    console.error(`❌ encode échoué pour ${file} : ${r.stderr}`);
-    try { unlinkSync(tmp); } catch {}
-    failed++;
-    continue;
+    const ext = extname(file).toLowerCase();
+    const tmp = join(ROOT, file + '.tmp' + ext);
+    const codec = ext === '.wav' ? ['-c:a', 'pcm_s16le'] : ['-c:a', 'libmp3lame', '-q:a', '2'];
+    const r = spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', file,
+      '-af', `volume=${gain.toFixed(2)}dB`, ...codec, tmp], { cwd: ROOT, encoding: 'utf8' });
+    if (r.status !== 0) {
+      console.error(`❌ encode échoué pour ${file} : ${r.stderr}`);
+      try { unlinkSync(tmp); } catch {}
+      failed++;
+      continue;
+    }
+    renameSync(tmp, join(ROOT, file));
+    const after = detect(file);
+    console.log(`✓ ${label} → gain ${gain.toFixed(1)} dB → moy ${after.mean} dB`);
   }
-  renameSync(tmp, join(ROOT, file));
-  const after = detect(file);
-  console.log(`✓ ${label} → gain ${gain.toFixed(1)} dB → moy ${after.mean} dB`);
 }
 
 if (failed > 0) { console.error(`\n${failed} fichier(s) en échec`); process.exit(1); }

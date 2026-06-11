@@ -16,6 +16,16 @@ export interface ChangelogEntry {
 // ⬇️ La plus récente EN PREMIER.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.2",
+    date: "11 juin 2026",
+    title: "À la Carte",
+    items: [
+      "⚙️ Roue crantée en jeu : réglez le volume de la musique et des effets sonores avec de vrais curseurs",
+      "🎵 Musiques d'ambiance enfin au même niveau — l'Ère Industrielle ne criera plus 10 dB trop fort",
+      "🔇 Le bouton « Effets sonores » fonctionne désormais vraiment",
+    ],
+  },
+  {
     version: "0.3.1",
     date: "11 juin 2026",
     title: "Égalisation Sonore",
