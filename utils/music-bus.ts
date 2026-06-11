@@ -5,12 +5,12 @@
 type VolumeTarget = { volume: number } | null;
 
 let activePlayer: VolumeTarget = null;
-let baseVolume = 0.25;
+let baseVolume = 0.15;
 
 let restoreTimer: ReturnType<typeof setTimeout> | undefined;
 let rampTimer: ReturnType<typeof setInterval> | undefined;
 
-const DUCK_FACTOR = 0.4;  // musique abaissée à 40 % de son volume pendant le SFX
+const DUCK_FACTOR = 0.25; // musique abaissée à 25 % de son volume pendant le SFX
 const HOLD_MS     = 300;  // maintien après le dernier achat
 const RAMP_MS     = 550;  // remontée douce
 const RAMP_STEPS  = 12;

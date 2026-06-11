@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
@@ -11,6 +11,12 @@ import * as Updates from 'expo-updates';
  * (plus sur le clicker). Composant autonome : pas de dépendance au GameProvider.
  */
 export function UpdatePrompt() {
+  // Sur web, pas d'OTA : un rechargement de page suffit, le bandeau n'a pas de sens
+  if (Platform.OS === 'web') return null;
+  return <UpdatePromptNative />;
+}
+
+function UpdatePromptNative() {
   const { isUpdateAvailable, isUpdatePending } = Updates.useUpdates();
   const [dismissed, setDismissed] = useState(false);
   const [installing, setInstalling] = useState(false);

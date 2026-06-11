@@ -16,6 +16,16 @@ export interface ChangelogEntry {
 // ⬇️ La plus récente EN PREMIER.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.1",
+    date: "11 juin 2026",
+    title: "Égalisation Sonore",
+    items: [
+      "🔊 Tous les sons d'amélioration sont au même volume (fini l'ordinateur qui hurle et le jacquouille inaudible)",
+      "🎵 Musique d'ambiance plus discrète, encore plus pendant les sons d'achat",
+      "🌐 Le jeu est désormais jouable dans le navigateur : projet-react-native.expo.app",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "11 juin 2026",
     title: "La Fin du Voyage",

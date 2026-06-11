@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { getSettings } from '@/hooks/use-settings';
 import { setActiveMusic } from '@/utils/music-bus';
 
-const VOLUME     = 0.25;
+const VOLUME     = 0.15; // musique discrète : les SFX d'upgrade (normalisés) restent devant
 const FADE_STEPS = 25;
 const FADE_MS    = 1500;
 
