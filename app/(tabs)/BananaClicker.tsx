@@ -34,7 +34,9 @@ import { GoldenBanana } from '@/components/banana-clicker/golden-banana';
 import { AchievementNotification } from '@/components/banana-clicker/achievement-notification';
 import { QuestNotification } from '@/components/banana-clicker/quest-notification';
 import { WeatherOverlay } from '@/components/banana-clicker/weather-overlay';
+import { EndGameCelebration } from '@/components/banana-clicker/end-game-celebration';
 import { useSounds } from '@/hooks/use-sounds';
+import { useProfile } from '@/hooks/use-profile';
 import { useAgeTheme } from '@/hooks/use-age-theme';
 import { registerTutorialRef, fireTutorialEvent, isBananaLocked } from '@/utils/tutorial-refs';
 
@@ -223,16 +225,26 @@ function PulseDot({ color }: { color: string }) {
   return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
 }
 
+interface HalfUpgradeReq {
+  id: string;
+  name: string;
+  owned: number;
+  required: number;
+}
+
 interface MigrationModalProps {
   migrationNumber: number;
+  totalInAge: number;
   isAgeAdvance: boolean;
+  isFinal: boolean;
   nextAgeName?: string;
   currentAgeName: string;
-  req: { totalBananas: number; claimedQuestId: string; description: string; minTransports?: number; allZonesMaxed?: boolean };
+  req: { totalBananas: number; claimedQuestId: string; description: string; minTransports?: number; allZonesMaxed?: boolean; halfUpgrades?: boolean };
   questMet: boolean;
   bananaMet: boolean;
   transportMet: boolean;
   zonesMaxedMet: boolean;
+  halfReqs: HalfUpgradeReq[];
   totalBananas: number;
   whalesOwned: number;
   canMigrate: boolean;
@@ -246,27 +258,36 @@ const MIGRATION_BONUSES = [
   { emoji: '⚡', label: 'Combo de clics' },
 ];
 
+// Dernier âge : 2 migrations seulement, la seconde termine le jeu
+const LAST_AGE_BONUSES = [
+  { emoji: '🧬', label: '+1 🍌/clic permanent' },
+  { emoji: '🏁', label: 'Fin du jeu !' },
+];
+
 function MigrationModal({
-  migrationNumber, isAgeAdvance, nextAgeName, currentAgeName,
-  req, questMet, bananaMet, transportMet, zonesMaxedMet,
+  migrationNumber, totalInAge, isAgeAdvance, isFinal, nextAgeName, currentAgeName,
+  req, questMet, bananaMet, transportMet, zonesMaxedMet, halfReqs,
   totalBananas, whalesOwned, canMigrate, onConfirm, onClose,
 }: MigrationModalProps) {
   const router = useRouter();
+  const bonuses = totalInAge === 2 ? LAST_AGE_BONUSES : MIGRATION_BONUSES;
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={modalStyles.backdrop} onPress={onClose} />
       <View style={modalStyles.sheet}>
-        <Text style={modalStyles.emoji}>🌍</Text>
-        <Text style={modalStyles.title}>Grande Migration</Text>
+        <Text style={modalStyles.emoji}>{isFinal ? '🏁' : '🌍'}</Text>
+        <Text style={modalStyles.title}>{isFinal ? 'Migration Finale' : 'Grande Migration'}</Text>
         <Text style={modalStyles.subtitle}>
-          {isAgeAdvance && nextAgeName
+          {isFinal
+            ? 'La dernière étape de votre voyage !'
+            : isAgeAdvance && nextAgeName
             ? `Passage vers ${nextAgeName}`
             : `Tu restes dans ${currentAgeName}`}
         </Text>
 
-        {/* Progression des 3 migrations */}
+        {/* Progression des migrations de l'âge */}
         <View style={modalStyles.progressStrip}>
-          {MIGRATION_BONUSES.map((b, i) => {
+          {bonuses.map((b, i) => {
             const num     = i + 1;
             const isCurrent = num === migrationNumber;
             const isDone    = num < migrationNumber;
@@ -277,7 +298,7 @@ function MigrationModal({
                   {b.label}
                 </Text>
                 <Text style={[modalStyles.progressNum, isCurrent && modalStyles.progressNumActive]}>
-                  {num}/3
+                  {num}/{totalInAge}
                 </Text>
               </View>
             );
@@ -296,13 +317,26 @@ function MigrationModal({
               </Pressable>
             )}
           </View>
-          <View style={modalStyles.criteriaRow}>
-            <Text style={[modalStyles.criteriaCheck, bananaMet && modalStyles.met]}>{bananaMet ? '✓' : '○'}</Text>
-            <Text style={[modalStyles.criteriaText, { flex: 1 }]}>
-              {formatBananas(req.totalBananas)} 🍌 récoltées
-              {!bananaMet && ` (${formatBananas(totalBananas)} / ${formatBananas(req.totalBananas)})`}
-            </Text>
-          </View>
+          {req.totalBananas > 0 && (
+            <View style={modalStyles.criteriaRow}>
+              <Text style={[modalStyles.criteriaCheck, bananaMet && modalStyles.met]}>{bananaMet ? '✓' : '○'}</Text>
+              <Text style={[modalStyles.criteriaText, { flex: 1 }]}>
+                {formatBananas(req.totalBananas)} 🍌 récoltées
+                {!bananaMet && ` (${formatBananas(totalBananas)} / ${formatBananas(req.totalBananas)})`}
+              </Text>
+            </View>
+          )}
+          {req.halfUpgrades && halfReqs.map(r => {
+            const met = r.owned >= r.required;
+            return (
+              <View key={r.id} style={modalStyles.criteriaRow}>
+                <Text style={[modalStyles.criteriaCheck, met && modalStyles.met]}>{met ? '✓' : '○'}</Text>
+                <Text style={[modalStyles.criteriaText, { flex: 1 }]}>
+                  {r.name} : la moitié de la limite ({r.owned}/{r.required})
+                </Text>
+              </View>
+            );
+          })}
           {req.minTransports && (
             <View style={modalStyles.criteriaRow}>
               <Text style={[modalStyles.criteriaCheck, transportMet && modalStyles.met]}>{transportMet ? '✓' : '○'}</Text>
@@ -335,7 +369,7 @@ function MigrationModal({
           onPress={canMigrate ? onConfirm : undefined}
         >
           <Text style={modalStyles.confirmTxt}>
-            {canMigrate ? '🌍 Migrer maintenant' : '🔒 Critères non remplis'}
+            {canMigrate ? (isFinal ? '🏁 Terminer le jeu' : '🌍 Migrer maintenant') : '🔒 Critères non remplis'}
           </Text>
         </Pressable>
         <Pressable style={modalStyles.cancelBtn} onPress={onClose}>
@@ -444,9 +478,9 @@ function MigrationAnimation({ currentAge, onComplete }: { currentAge: number; on
   );
 }
 
-function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => void; migrationNumber: number; ready: boolean }) {
+function MigrationButton({ onPress, migrationNumber, totalInAge, isFinal, ready }: { onPress: () => void; migrationNumber: number; totalInAge: number; isFinal: boolean; ready: boolean }) {
   const scale = useSharedValue(1);
-  const isAgeAdvance = migrationNumber === 3;
+  const isAgeAdvance = !isFinal && migrationNumber === totalInAge;
   useEffect(() => {
     if (!ready) return;
     scale.value = withRepeat(
@@ -458,16 +492,18 @@ function MigrationButton({ onPress, migrationNumber, ready }: { onPress: () => v
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={style}>
-      <Pressable style={[styles.migrationBtn, !ready && styles.migrationBtnLocked, isAgeAdvance && ready && styles.migrationBtnAge]} onPress={onPress}>
-        <Text style={styles.migrationEmoji}>{isAgeAdvance ? (ready ? '🌅' : '🔒') : (ready ? '🌍' : '🔒')}</Text>
+      <Pressable style={[styles.migrationBtn, !ready && styles.migrationBtnLocked, (isAgeAdvance || isFinal) && ready && styles.migrationBtnAge]} onPress={onPress}>
+        <Text style={styles.migrationEmoji}>{!ready ? '🔒' : isFinal ? '🏁' : isAgeAdvance ? '🌅' : '🌍'}</Text>
         <View>
           <Text style={styles.migrationTitle}>
-            {isAgeAdvance ? 'Changer d\'Ère' : `Migration ${migrationNumber}/3`}
+            {isFinal ? 'Migration Finale' : isAgeAdvance ? 'Changer d\'Ère' : `Migration ${migrationNumber}/${totalInAge}`}
           </Text>
           <Text style={styles.migrationSub}>
-            {isAgeAdvance
-              ? (ready ? 'Passer à l\'ère suivante !' : 'Critères non remplis')
-              : (ready ? 'Prêt à migrer !' : 'Critères non remplis')}
+            {!ready
+              ? 'Critères non remplis'
+              : isFinal ? 'Terminer le jeu !'
+              : isAgeAdvance ? 'Passer à l\'ère suivante !'
+              : 'Prêt à migrer !'}
           </Text>
         </View>
       </Pressable>
@@ -480,6 +516,7 @@ export default function BananaClicker() {
   const theme  = useAgeTheme();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+  const { pseudo } = useProfile();
 
   const bananaRef       = useRef<View>(null);
   const bananaButtonRef = useRef<BananaButtonHandle>(null);
@@ -510,6 +547,7 @@ export default function BananaClicker() {
   const [autoClickEnabled, setAutoClickEnabled] = useState(true);
   const [showMigrationModal, setShowMigrationModal] = useState(false);
   const [showMigrationAnim, setShowMigrationAnim]   = useState(false);
+  const [showEndGame, setShowEndGame]               = useState(false);
 
   const prevClaimed      = useRef<string[]>(state.claimedQuests);
   const prevAchievements = useRef<string[]>(state.unlockedAchievements);
@@ -523,20 +561,37 @@ export default function BananaClicker() {
   // --- Grande Migration ---
   const migrationInAge   = state.totalMigrations % 3;
   const currentAgeConfig = AGES[state.currentAge];
+  const migrationsInAge  = currentAgeConfig?.migrations?.length ?? 0;
   const req              = currentAgeConfig?.migrations?.[migrationInAge] ?? null;
+  const isLastAge        = state.currentAge === AGES.length - 1;
+  const isFinalMigration = isLastAge && req !== null && migrationInAge === migrationsInAge - 1;
+  const gameFinished     = isLastAge && migrationsInAge > 0 && migrationInAge >= migrationsInAge;
   const ageQuestIds      = useMemo(
     () => QUESTS.filter(q => (q.minAge ?? 0) === state.currentAge).map(q => q.id),
     [state.currentAge],
   );
   const allQuestsClaimed = ageQuestIds.length > 0 && ageQuestIds.every(id => state.claimedQuests.includes(id));
   const questMet        = allQuestsClaimed;
-  const bananaMet       = req !== null && state.totalBananas >= req.totalBananas;
+  const bananaMet       = req !== null && (req.totalBananas <= 0 || state.totalBananas >= req.totalBananas);
   const transportMet    = !req?.minTransports || state.whalesOwned >= req.minTransports;
   const zonesMaxedMet   = !req?.allZonesMaxed || ZONES
     .filter(z => z.minAge === state.currentAge)
     .every(z => (state.zoneLevels[z.id] ?? 0) >= 3);
-  const canMigrate       = questMet && bananaMet && transportMet && zonesMaxedMet;
-  const showMigrationBtn = questMet;
+  // Dernier âge : posséder la moitié de la limite de chaque amélioration
+  const halfReqs = useMemo<HalfUpgradeReq[]>(() => {
+    if (!req?.halfUpgrades) return [];
+    return UPGRADES
+      .filter(u => (u.minAge ?? 0) === state.currentAge && u.maxCount)
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        owned: state.upgrades[u.id] ?? 0,
+        required: Math.ceil((u.maxCount ?? 0) / 2),
+      }));
+  }, [req, state.currentAge, state.upgrades]);
+  const halfMet          = halfReqs.every(r => r.owned >= r.required);
+  const canMigrate       = req !== null && questMet && bananaMet && transportMet && zonesMaxedMet && halfMet;
+  const showMigrationBtn = questMet && req !== null;
 
   // --- Quêtes ---
   const completedQuestIds = useMemo(
@@ -698,7 +753,15 @@ export default function BananaClicker() {
 
   function confirmMigrate() {
     setShowMigrationModal(false);
-    if (migrationInAge < 2) sounds.playMigration();
+    if (isFinalMigration) {
+      // Dernière migration du dernier âge : fin du jeu, célébration gorille
+      migrate();
+      sounds.playEndGame();
+      setShowEndGame(true);
+      return;
+    }
+    if (migrationInAge === 2) sounds.playAgeTransition();
+    else sounds.playMigration();
     setShowMigrationAnim(true);
   }
 
@@ -857,14 +920,29 @@ export default function BananaClicker() {
         <MigrationButton
           onPress={handleMigrate}
           migrationNumber={migrationInAge + 1}
+          totalInAge={migrationsInAge}
+          isFinal={isFinalMigration}
           ready={canMigrate}
         />
+      )}
+
+      {/* Jeu terminé — bannière permanente, tap pour revoir la célébration */}
+      {gameFinished && (
+        <Pressable style={[styles.migrationBtn, styles.finishedBanner]} onPress={() => setShowEndGame(true)}>
+          <Text style={styles.migrationEmoji}>🏆</Text>
+          <View>
+            <Text style={styles.migrationTitle}>Jeu terminé — Bravo {pseudo} !</Text>
+            <Text style={styles.migrationSub}>Tap pour revoir la célébration</Text>
+          </View>
+        </Pressable>
       )}
 
       {showMigrationModal && req && (
         <MigrationModal
           migrationNumber={migrationInAge + 1}
-          isAgeAdvance={migrationInAge === 2}
+          totalInAge={migrationsInAge}
+          isAgeAdvance={!isLastAge && migrationInAge === 2}
+          isFinal={isFinalMigration}
           nextAgeName={AGES[state.currentAge + 1]?.name}
           currentAgeName={currentAgeConfig?.name ?? ''}
           req={req}
@@ -872,6 +950,7 @@ export default function BananaClicker() {
           bananaMet={bananaMet}
           transportMet={transportMet}
           zonesMaxedMet={zonesMaxedMet}
+          halfReqs={halfReqs}
           totalBananas={state.totalBananas}
           whalesOwned={state.whalesOwned}
           canMigrate={canMigrate}
@@ -882,6 +961,10 @@ export default function BananaClicker() {
 
       {showMigrationAnim && (
         <MigrationAnimation currentAge={state.currentAge} onComplete={finalizeMigrate} />
+      )}
+
+      {showEndGame && (
+        <EndGameCelebration playerName={pseudo} onClose={() => setShowEndGame(false)} />
       )}
 
       <View style={[styles.tabSwitcher, { backgroundColor: theme.panelBg, borderBottomColor: theme.panelBorder }]}>
@@ -1029,6 +1112,7 @@ const styles = StyleSheet.create({
   migrationSub:        { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
   migrationBtnLocked:  { backgroundColor: '#4e342e', borderColor: '#8d6e63' },
   migrationBtnAge:     { backgroundColor: '#0d47a1', borderColor: '#42a5f5' },
+  finishedBanner:      { backgroundColor: '#4a3500', borderColor: '#ffd700' },
   boosterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#1a237e', paddingHorizontal: 16, paddingVertical: 10,

@@ -16,6 +16,17 @@ export interface ChangelogEntry {
 // ⬇️ La plus récente EN PREMIER.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "11 juin 2026",
+    title: "La Fin du Voyage",
+    items: [
+      "🏁 Le jeu a désormais une fin : 2 Migrations Finales à l'Ère Robotique (possède la moitié de chaque amélioration pour les déclencher)",
+      "🦍 Célébration de fin de jeu : gorille déchaîné, pluie de bananes... et la mesure officielle de ta banane",
+      "🌙 La modale de retour t'accueille par ton pseudo avec le temps de farm et les bananes récoltées",
+      "🔊 Nouveau son du Drone et son dédié au changement d'ère",
+    ],
+  },
+  {
     version: "0.2.1",
     date: "10 juin 2026",
     title: "Grand Équilibrage",

@@ -1,16 +1,18 @@
 export interface MigrationRequirements {
-  totalBananas: number;
+  totalBananas: number;    // 0 = pas de critère bananes
   claimedQuestId: string;
   description: string;
   minTransports?: number;  // whalesOwned minimum requis
   allZonesMaxed?: boolean; // toutes les zones de l'âge au niveau 3
+  halfUpgrades?: boolean;  // posséder la moitié du maxCount de chaque upgrade de l'âge
 }
 
 export interface AgeConfig {
   id: number;
   name: string;
   emoji: string;
-  migrations: [MigrationRequirements, MigrationRequirements, MigrationRequirements] | null;
+  // 3 migrations par âge (la 3e change d'ère) — sauf le dernier âge : 2 migrations puis fin du jeu
+  migrations: MigrationRequirements[] | null;
 }
 
 export const AGES: AgeConfig[] = [
@@ -58,6 +60,9 @@ export const AGES: AgeConfig[] = [
     id: 4,
     name: "L'Ère Robotique",
     emoji: '🤖',
-    migrations: null,
+    migrations: [
+      { totalBananas: 0, claimedQuestId: 'buy_1_megastructure', description: 'La moitié de chaque amélioration', halfUpgrades: true },
+      { totalBananas: 0, claimedQuestId: 'buy_1_megastructure', description: 'La moitié de chaque amélioration', halfUpgrades: true },
+    ],
   },
 ];

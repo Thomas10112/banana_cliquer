@@ -11,6 +11,7 @@ import {
 import { getHero, HERO_MAX_LEVEL } from './heroes-config';
 import { MENACES } from './menaces-config';
 import { GameAction, GameState, WhaleTrip, RaidEntry } from './types';
+import { AGES } from './ages-config';
 
 const RAID_CHANCE = 0.25;     // proba d'embuscade par voyage livré
 const RAID_LOG_MAX = 20;      // taille max du journal de raids
@@ -444,6 +445,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'GRANDE_MIGRATION': {
+      // Pas de migration au-delà de celles définies pour l'âge (dernier âge : 2 puis fin du jeu)
+      const ageMigrations = AGES[state.currentAge]?.migrations;
+      if (!ageMigrations || state.totalMigrations % 3 >= ageMigrations.length) return state;
       const newTotal      = state.totalMigrations + 1;
       const migDoneInAge  = (newTotal - 1) % 3;
       const newAge        = Math.floor(newTotal / 3);

@@ -21,15 +21,16 @@ export function useSounds() {
   // Âge 3
   const ingenieurPlayer    = useAudioPlayer(require('@/assets/sounds/age-3/ingenieur.mp3'));
   const ordinateurPlayer   = useAudioPlayer(require('@/assets/sounds/age-3/ordinateur.mp3'));
-  const dronePlayer        = useAudioPlayer(require('@/assets/sounds/age-3/drone.aac'));
+  const dronePlayer        = useAudioPlayer(require('@/assets/sounds/age-3/drone.mp3'));
   const satellitePlayer    = useAudioPlayer(require('@/assets/sounds/age-3/satellite.mp3'));
   // Âge 4
   const robotPlayer        = useAudioPlayer(require('@/assets/sounds/age-4/robot.mp3'));
   const iaPlayer           = useAudioPlayer(require('@/assets/sounds/age-4/ia.mp3'));
   const megastructurePlayer = useAudioPlayer(require('@/assets/sounds/age-4/megasturucture.mp3'));
   // UI
-  const questPlayer     = useAudioPlayer(require('@/assets/sounds/ui/mixkit-achievement-bell-600.wav'));
-  const migrationPlayer = useAudioPlayer(require('@/assets/sounds/ambiances/migrations.mp3'));
+  const questPlayer         = useAudioPlayer(require('@/assets/sounds/ui/mixkit-achievement-bell-600.wav'));
+  const migrationPlayer     = useAudioPlayer(require('@/assets/sounds/ambiances/migrations.mp3'));
+  const ageTransitionPlayer = useAudioPlayer(require('@/assets/sounds/ambiances/transfert.aac'));
 
   const playBuy = useCallback((upgradeId: string) => {
     const player =
@@ -70,5 +71,20 @@ export function useSounds() {
     migrationPlayer.play();
   }, [migrationPlayer]);
 
-  return { playBuy, playQuest, playMigration };
+  const playAgeTransition = useCallback(() => {
+    ageTransitionPlayer.volume = 1;
+    duckMusic();
+    ageTransitionPlayer.seekTo(0);
+    ageTransitionPlayer.play();
+  }, [ageTransitionPlayer]);
+
+  // Fin de jeu — cri louphoque (chewbacca) par-dessus la musique baissée
+  const playEndGame = useCallback(() => {
+    girafePlayer.volume = 1;
+    duckMusic();
+    girafePlayer.seekTo(0);
+    girafePlayer.play();
+  }, [girafePlayer]);
+
+  return { playBuy, playQuest, playMigration, playAgeTransition, playEndGame };
 }

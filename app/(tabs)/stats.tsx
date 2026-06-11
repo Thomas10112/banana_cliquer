@@ -120,7 +120,12 @@ export default function Stats() {
           <StatCard
             emoji="🚶"
             label="Grandes Migrations"
-            value={`${state.totalMigrations} (âge ${state.currentAge + 1}, étape ${(state.totalMigrations % 3) + 1}/3)`}
+            value={(() => {
+              const total = AGES[state.currentAge]?.migrations?.length ?? 3;
+              const step  = state.totalMigrations % 3;
+              if (step >= total) return `${state.totalMigrations} (âge ${state.currentAge + 1}, terminé 🏁)`;
+              return `${state.totalMigrations} (âge ${state.currentAge + 1}, étape ${step + 1}/${total})`;
+            })()}
           />
         )}
         {state.heritageBpc > 0 && (

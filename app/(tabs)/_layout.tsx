@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useAgeTheme } from '@/hooks/use-age-theme';
+import { useProfile } from '@/hooks/use-profile';
 import { useAmbiance } from '@/hooks/use-ambiance';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useTutorial } from '@/hooks/use-tutorial';
@@ -28,6 +29,7 @@ function formatDuration(seconds: number): string {
 
 function OfflineGainsModal() {
   const { pendingOfflineGains, pendingOfflineSeconds, claimOfflineGains } = useGameContext();
+  const { pseudo } = useProfile();
   const visible = pendingOfflineGains > 0;
 
   return (
@@ -35,18 +37,27 @@ function OfflineGainsModal() {
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.emoji}>🌙</Text>
-          <Text style={styles.title}>Pendant ton absence…</Text>
+          <Text style={styles.title}>Bon retour, {pseudo} !</Text>
           <Text style={styles.subtitle}>
-            {formatDuration(pendingOfflineSeconds)} de production accumulée
+            Tes singes ont farmé pendant ton absence
           </Text>
 
-          <View style={styles.rewardRow}>
-            <Text style={styles.rewardAmount}>+{formatBananas(pendingOfflineGains)}</Text>
-            <Text style={styles.rewardEmoji}>🍌</Text>
+          <View style={styles.offlineRows}>
+            <View style={styles.offlineRow}>
+              <Text style={styles.offlineLabel}>⏱️ Temps de farm</Text>
+              <Text style={styles.offlineValue}>{formatDuration(pendingOfflineSeconds)}</Text>
+            </View>
+            <View style={[styles.offlineRow, styles.offlineRowLast]}>
+              <Text style={styles.offlineLabel}>🍌 Bananes récoltées</Text>
+              <Text style={[styles.offlineValue, styles.offlineValueGold]}>+{formatBananas(pendingOfflineGains)}</Text>
+            </View>
           </View>
 
           <Pressable style={styles.claimBtn} onPress={claimOfflineGains}>
             <Text style={styles.claimTxt}>Récolter !</Text>
+          </Pressable>
+          <Pressable style={styles.skipTutorialBtn} onPress={claimOfflineGains}>
+            <Text style={styles.skipTutorialTxt}>Quitter</Text>
           </Pressable>
         </View>
       </View>
@@ -321,6 +332,27 @@ const styles = StyleSheet.create({
   },
   rewardAmount: { fontSize: 32, fontWeight: '900', color: '#ffd700' },
   rewardEmoji:  { fontSize: 28 },
+  offlineRows: {
+    width: '100%',
+    backgroundColor: 'rgba(249,168,37,0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(249,168,37,0.35)',
+    marginTop: 4,
+  },
+  offlineRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  offlineRowLast:   { borderBottomWidth: 0 },
+  offlineLabel:     { fontSize: 13, color: 'rgba(255,255,255,0.6)' },
+  offlineValue:     { fontSize: 15, fontWeight: '800', color: '#fff' },
+  offlineValueGold: { color: '#ffd700', fontSize: 17 },
   claimBtn: {
     backgroundColor: '#f9a825',
     borderRadius: 14,
